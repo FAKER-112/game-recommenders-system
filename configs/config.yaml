@@ -6,11 +6,13 @@ data_ingestion:
   raw_data_dir: "data/raw"
 
 data_cleaning:
-  root_dir: "data/processed"
+  processed_dir: "data/processed"
   raw_data_dir: 'data/raw'
+  raw_files: [australian_users_items.json.gz,steam_games.json.gz]
 
 feature_engineering:
   root_dir: "data/processed"
+  cleaned_data_path: "data/processed/australian_users_items_merged.csv"
   transformed_train_path: "data/processed/train.csv"
   transformed_test_path: "data/processed/test.csv"
   transformed_data_path: "data/processed/transformed_df.csv"

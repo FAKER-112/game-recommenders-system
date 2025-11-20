@@ -18,7 +18,7 @@ class LoadDataService:
                 load_cfg.get("user_item_dataset_download_url"),
                 load_cfg.get("steam_game_dataset_download_url")
             ]
-            self.raw_data_dir = load_cfg.get("raw_data_dir")
+            self.raw_data_dir = load_cfg.get("raw_data_dir", "data/raw")
 
             if self.raw_data_dir:
                 os.makedirs(self.raw_data_dir, exist_ok=True)
