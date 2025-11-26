@@ -1,0 +1,36 @@
+model_training:
+  epochs: 10
+  batch_size: 32
+  transformed_train_path: "data/processed/train.csv"
+  transformed_test_path: "data/processed/test.csv"
+  transformed_data_path: "data/processed/transformed_df.csv"
+
+model_params:
+  autoencoder:
+    input_dim: 5000
+    encoding_dim: 64
+    hidden_layers: [512, 256]
+    activation: 'relu'
+    optimizer: 'adam'
+    loss: 'binary_crossentropy'
+    metrics: ['accuracy']
+
+  matrix_factorization:
+    num_users: 1000
+    num_items: 500
+    embedding_size: 50
+    hidden_layers: [512, 256]
+    activation: 'relu'
+    optimizer: 'adam'
+    loss: 'mse'
+    metrics: ['accuracy']
+
+  tfrs:
+    num_users: 1000
+    num_items: 500
+    embedding_size: 50
+    hidden_layers: [512, 256]
+    activation: 'relu'
+    optimizer: 'adam'
+    loss: 'mse'
+    metrics: ['accuracy']
