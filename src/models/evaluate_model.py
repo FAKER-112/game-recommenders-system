@@ -9,6 +9,8 @@ import mlflow.keras
 from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestNeighbors
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 from src.utils.exception import CustomException
 from src.utils.logger import logger
 from src.utils.utils import load_config, calculate_precision_at_k, calculate_ap_at_k, calculate_ndcg_at_k

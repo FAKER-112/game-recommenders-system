@@ -1,3 +1,25 @@
+"""
+Model Builder Script
+--------------------
+This script defines the `ModelBuilder` class, which is responsible for constructing and compiling
+three different types of recommendation models:
+
+1.  **Autoencoder (Content-Based Filtering)**:
+    -   **Data Prep**: Uses TF-IDF to vectorize item descriptions (`item_text`).
+    -   **Model**: A symmetric autoencoder that learns compressed representations (embeddings) of items.
+    -   **Goal**: Reconstruct item features; useful for finding similar items based on content.
+
+2.  **Matrix Factorization (Collaborative Filtering)**:
+    -   **Data Prep**: Encodes User IDs and Item Names into integer indices.
+    -   **Model**: Learns separate embedding vectors for Users and Items. Computes the dot product to predict ratings.
+    -   **Goal**: Predict user preference (rating) for unseen items.
+
+3.  **TensorFlow Recommenders (TFRS) (Retrieval)**:
+    -   **Data Prep**: Converts inputs to strings and creates TensorFlow Datasets. Builds vocabularies for User IDs, Item Names, and Item Text.
+    -   **Model**: A Two-Tower architecture (User Tower & Item Tower) that learns to map users and items into a shared embedding space.
+    -   **Goal**: Efficiently retrieve top-k relevant items for a user from the entire catalog.
+"""
+
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -23,35 +45,25 @@ class ModelBuilder:
     # 1. AUTOENCODER (Content-Based)
     # ==========================================
 
-    def prepare_data_autoencoder(
-        self, train_df: pd.DataFrame, test_df: pd.DataFrame
-    ) -> Tuple[np.ndarray, np.ndarray, int]:
-        """
-        Prepares data for the Autoencoder model using TF-IDF on item text.
-        Fits TF-IDF on training data, transforms both train and test.
-        """
-        # Create unique game dataframes for content extraction
-        train_content = train_df.drop_duplicates(subset="item_name").reset_index(
-            drop=True
-        )
-        test_content = test_df.drop_duplicates(subset="item_name").reset_index(
-            drop=True
-        )
+def prepare_data_autoencoder(
+    self, df: pd.DataFrame
+) -> Tuple[np.ndarray, pd.Series,list int]:
+    """
+    Prepares data for the Autoencoder model using TF-IDF on item text.
+    """
+    # Create unique game dataframes for content extraction
+    train_content = df.drop_duplicates(subset="item_name").reset_index(drop=True)
+    indices = pd.Series(train_content.index, index=train_content['item_name']).drop_duplicates()
+    
+    # Convert text to numbers (TF-IDF)
+    tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
+    tfidf.fit(train_content["item_text"].fillna(""))
+    X = tfidf.transform(train_content["item_text"].fillna("")).toarray()
+    
+    input_dim = X.shape[1]
+    global_item_names = train_content['item_name'].tolist()
 
-        # Convert text to numbers (TF-IDF)
-        tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
-
-        # Fit on training data only to prevent leakage
-        tfidf.fit(train_content["item_text"].fillna(""))
-
-        # Transform both
-        X_train = tfidf.transform(train_content["item_text"].fillna("")).toarray()
-        X_test = tfidf.transform(test_content["item_text"].fillna("")).toarray()
-
-        input_dim = X_train.shape[1]
-
-        return X_train, X_test, input_dim
-
+    return X, indices, global_item_names, input_dim
     def build_autoencoder_model(self, input_dim: int, encoding_dim: int = 64) -> Model:
         """
         Builds an Autoencoder Neural Network.

@@ -1,4 +1,5 @@
 import os
+import json
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -20,11 +21,12 @@ class ModelTrainingService:
 
             # Load model training config
             model_cfg = self.config.get("model_training", {})
-            self.root_dir = model_cfg.get("root_dir", "models")
+            self.root_dir = model_cfg.get("root_dir", "artifacts/models")
             os.makedirs(self.root_dir, exist_ok=True)
 
-            self.transformed_train_path = model_cfg.get("transformed_train_path")
-            self.transformed_test_path = model_cfg.get("transformed_test_path")
+            self.transformed_train_path = model_cfg.get("transformed_train_path", 'data/processed/train.csv')
+            self.transformed_test_path = model_cfg.get("transformed_test_path", 'data/processed/test.csv')
+            self.transformed_data_path = model_cfg.get("transformed_data_path", 'data/processed/data.csv')
             self.model_builder = ModelBuilder()
 
             # Initialize MLflow
@@ -40,12 +42,17 @@ class ModelTrainingService:
                 # Load Data
                 train_df = pd.read_csv(self.transformed_train_path)
                 test_df = pd.read_csv(self.transformed_test_path)
+                df= pd.read_csv(self.transformed_data_path)
 
                 # Prepare Data
-                X_train, X_test, input_dim = (
+                X, indices, itemlist, input_dim = (
                     self.model_builder.prepare_data_autoencoder(train_df, test_df)
                 )
-
+                np.save('autoencoder_X.npy', X)
+                indices.to_csv('autoencoder_indices.csv')
+                listpath= 'autoencoder_itemlist.json'
+                with open(listpath, "w") as f:
+                    json.dump(itemlist, f, indent=4)
                 # Build Model
                 params = self.config["model_params"]["autoencoder"]
                 mlflow.log_params(params)
@@ -56,8 +63,8 @@ class ModelTrainingService:
 
                 # Train
                 history = autoencoder.fit(
-                    X_train,
-                    X_train,
+                    X,
+                    X,
                     epochs=self.config["model_training"]["epochs"],
                     batch_size=self.config["model_training"]["batch_size"],
                     validation_data=(X_test, X_test),
