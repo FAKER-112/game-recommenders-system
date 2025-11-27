@@ -41,3 +41,54 @@ def load_config(config_path: str = "configs/config.yaml") -> dict:
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     return config
+
+
+
+
+# --- 1. METRIC FUNCTIONS ---
+
+
+def calculate_precision_at_k(recommended_items, ground_truth_items, k=10):
+    """Calculates Precision@K."""
+    recommended_k = recommended_items[:k]
+    relevant_count = len(set(recommended_k) & set(ground_truth_items))
+    return relevant_count / k
+
+
+def calculate_ap_at_k(recommended_items, ground_truth_items, k=10):
+    """Calculates Average Precision@K."""
+    if not ground_truth_items:
+        return 0.0
+
+    relevant_count = 0
+    running_sum = 0.0
+
+    for i, item in enumerate(recommended_items[:k]):
+        if item in ground_truth_items:
+            relevant_count += 1
+            precision_at_i = relevant_count / (i + 1)
+            running_sum += precision_at_i
+
+    if relevant_count == 0:
+        return 0.0
+    return running_sum / min(len(ground_truth_items), k)
+
+
+def calculate_ndcg_at_k(recommended_items, ground_truth_items, k=10):
+    """Calculates NDCG@K."""
+    dcg = 0.0
+    idcg = 0.0
+
+    # 1. Calculate DCG
+    for i, item in enumerate(recommended_items[:k]):
+        if item in ground_truth_items:
+            dcg += 1.0 / math.log2(i + 2)
+
+    # 2. Calculate IDCG
+    num_relevant = min(len(ground_truth_items), k)
+    for i in range(num_relevant):
+        idcg += 1.0 / math.log2(i + 2)
+
+    if idcg == 0.0:
+        return 0.0
+    return dcg / idcg
