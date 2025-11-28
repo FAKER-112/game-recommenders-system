@@ -2,6 +2,7 @@ model_training:
   epochs: 10
   batch_size: 32
   root_dir: 'artifacts/models'
+  context_dir: 'artifacts/context'
   transformed_train_path: "data/processed/train.csv"
   transformed_test_path: "data/processed/test.csv"
   transformed_data_path: "data/processed/transformed_df.csv"

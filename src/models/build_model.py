@@ -47,7 +47,7 @@ class ModelBuilder:
 
 def prepare_data_autoencoder(
     self, df: pd.DataFrame
-) -> Tuple[np.ndarray, pd.Series,list int]:
+) -> Tuple[np.ndarray, pd.Series,list, int]:
     """
     Prepares data for the Autoencoder model using TF-IDF on item text.
     """
@@ -127,6 +127,7 @@ def prepare_data_autoencoder(
             test_item_ids,
             num_users,
             num_items,
+            user_encoder, item encoder
         )
 
     def build_mf_model(
@@ -217,7 +218,8 @@ def prepare_data_autoencoder(
         # Text Vectorization
         text_vectorizer = tf.keras.layers.TextVectorization(max_tokens=10000)
         text_vectorizer.adapt(items.map(lambda x: x["item_text"]))
-
+        all_df = pd.concat([train_df, test_df])
+        unique_items_df = all_df.drop_duplicates(subset=['item_name'])[['item_name', 'item_text']]
         return {
             "train_ds": train_ds,
             "test_ds": test_ds,
@@ -225,6 +227,7 @@ def prepare_data_autoencoder(
             "user_ids_vocabulary": user_ids_vocabulary,
             "item_titles_vocabulary": item_titles_vocabulary,
             "text_vectorizer": text_vectorizer,
+            "unique_items_df": unique_items_df
         }
 
     def build_tfrs_model(self, data_dict: Dict[str, Any]) -> tfrs.Model:

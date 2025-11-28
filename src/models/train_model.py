@@ -1,5 +1,6 @@
 import os
 import json
+import pickle
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -22,6 +23,7 @@ class ModelTrainingService:
             # Load model training config
             model_cfg = self.config.get("model_training", {})
             self.root_dir = model_cfg.get("root_dir", "artifacts/models")
+            self.context_dir= model_cfg.get('context_dir', 'articfact/context')
             os.makedirs(self.root_dir, exist_ok=True)
 
             self.transformed_train_path = model_cfg.get("transformed_train_path", 'data/processed/train.csv')
@@ -48,9 +50,10 @@ class ModelTrainingService:
                 X, indices, itemlist, input_dim = (
                     self.model_builder.prepare_data_autoencoder(train_df, test_df)
                 )
-                np.save('autoencoder_X.npy', X)
-                indices.to_csv('autoencoder_indices.csv')
-                listpath= 'autoencoder_itemlist.json'
+
+                np.save(os.join(self.context_dir,'autoencoder_X.npy'), X)
+                indices.to_csv(os.join(self.context_dir,'autoencoder_indices.csv'))
+                listpath= os.join(self.context_dir,'autoencoder_itemlist.json')
                 with open(listpath, "w") as f:
                     json.dump(itemlist, f, indent=4)
                 # Build Model
@@ -100,8 +103,16 @@ class ModelTrainingService:
                     test_item_ids,
                     num_users,
                     num_items,
+                    user_encoder,
+                    item_emcoder
                 ) = self.model_builder.prepare_data_mf(train_df, test_df)
+                user_encoder_path = os.join(self.context_dir, "mf_user_encoder.pkl")
+                with open(user_encoder_path, "wb") as f:
+                    pickle.dump(user_encoder, f)
 
+                item_encoder_path = os.join(self.context_dir, "mf_item_encoder.pkl")
+                with open(item_encoder_path, "wb") as f:
+                    pickle.dump(item_encoder, f)                   
                 # Build Model
                 params = self.config["model_params"]["matrix_factorization"]
                 mlflow.log_params(params)
@@ -149,7 +160,10 @@ class ModelTrainingService:
                 # Build Model
                 params = self.config["model_params"]["tfrs"]
                 mlflow.log_params(params)
-
+                candidates_path = os.path.join(self.context_dir, "tfrs_candidates.pkl")
+                
+                with open(candidates_path, "wb") as f:
+                    pickle.dump(data_dict["unique_items_df"], f)
                 tfrs_model = self.model_builder.build_tfrs_model(data_dict)
                 tfrs_model.compile(
                     optimizer=tf.keras.optimizers.Adam(learning_rate=0.1)
