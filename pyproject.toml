@@ -1,0 +1,26 @@
+[tool.pyrefly]
+# Directories Pyrefly will type check
+project-includes = ["src", "tests"]
+
+# Platform to emulate during type checking
+# On Windows, we can set "windows" or "linux" if simulating a different platform
+python-platform = "windows"
+
+# Maximum number of files to check in large projects (adjust if needed)
+max-files = 2000
+
+# Enable or disable specific Pyrefly features
+[tool.pyrefly.features]
+# syntax highlighting and semantic tokens
+semantic-tokens = true
+# inlay hints
+inlay-hints = true
+# type checking
+type-checking = true
+
+[tool.pyrefly.errors]
+# Disable errors that are too noisy for your project
+bad-assignment = false
+bad-return = false
+bad-parameter = true
+unused-variable = false

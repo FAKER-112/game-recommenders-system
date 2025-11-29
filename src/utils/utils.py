@@ -4,6 +4,7 @@ import sys
 import pandas as pd 
 import numpy as np
 import yaml
+import math
 from src.utils.logger import logger
 from pathlib import Path
 from src.utils.exception import CustomException
@@ -29,7 +30,7 @@ def download_file(url, dest_folder):
         logger.info(f"Downloaded {filename} to {file_path}")
     except requests.exceptions.RequestException as e:
         logger.error(f"Error downloading {url}: {e}")
-        raise  # Re-raise the exception for the caller to handle if needed
+        raise CustomException(e) # Re-raise the exception for the caller to handle if needed
 
     return file_path
 

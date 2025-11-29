@@ -45,25 +45,25 @@ class ModelBuilder:
     # 1. AUTOENCODER (Content-Based)
     # ==========================================
 
-def prepare_data_autoencoder(
-    self, df: pd.DataFrame
-) -> Tuple[np.ndarray, pd.Series,list, int]:
-    """
-    Prepares data for the Autoencoder model using TF-IDF on item text.
-    """
-    # Create unique game dataframes for content extraction
-    train_content = df.drop_duplicates(subset="item_name").reset_index(drop=True)
-    indices = pd.Series(train_content.index, index=train_content['item_name']).drop_duplicates()
-    
-    # Convert text to numbers (TF-IDF)
-    tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
-    tfidf.fit(train_content["item_text"].fillna(""))
-    X = tfidf.transform(train_content["item_text"].fillna("")).toarray()
-    
-    input_dim = X.shape[1]
-    global_item_names = train_content['item_name'].tolist()
+    def prepare_data_autoencoder(
+        self, df: pd.DataFrame
+    ) -> Tuple[np.ndarray, pd.Series,list, int]:
+        """
+        Prepares data for the Autoencoder model using TF-IDF on item text.
+        """
+        # Create unique game dataframes for content extraction
+        train_content = df.drop_duplicates(subset="item_name").reset_index(drop=True)
+        indices = pd.Series(train_content.index, index=train_content['item_name']).drop_duplicates()
+        
+        # Convert text to numbers (TF-IDF)
+        tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
+        tfidf.fit(train_content["item_text"].fillna(""))
+        X = tfidf.transform(train_content["item_text"].fillna("")).toarray()
+        
+        input_dim = X.shape[1]
+        global_item_names = train_content['item_name'].tolist()
 
-    return X, indices, global_item_names, input_dim
+        return X, indices, global_item_names, input_dim
     def build_autoencoder_model(self, input_dim: int, encoding_dim: int = 64) -> Model:
         """
         Builds an Autoencoder Neural Network.
@@ -127,7 +127,8 @@ def prepare_data_autoencoder(
             test_item_ids,
             num_users,
             num_items,
-            user_encoder, item encoder
+            user_encoder,
+            item_encoder
         )
 
     def build_mf_model(

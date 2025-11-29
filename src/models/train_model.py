@@ -25,7 +25,7 @@ class ModelTrainingService:
             self.root_dir = model_cfg.get("root_dir", "artifacts/models")
             self.context_dir= model_cfg.get('context_dir', 'articfact/context')
             os.makedirs(self.root_dir, exist_ok=True)
-
+            os.makedirs(self.context_dir, exist_ok=True)
             self.transformed_train_path = model_cfg.get("transformed_train_path", 'data/processed/train.csv')
             self.transformed_test_path = model_cfg.get("transformed_test_path", 'data/processed/test.csv')
             self.transformed_data_path = model_cfg.get("transformed_data_path", 'data/processed/data.csv')
