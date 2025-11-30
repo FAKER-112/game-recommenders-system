@@ -30,8 +30,8 @@ class TrainingPipeline:
             clean_data.run()
             self.logger.info('Cleaning data completed')
             self.logger.info('Feature engineering started')
-            feature_engineering=FeatureEngineeringService(self.load_data_config)
-            feature_engineering.run()
+            # feature_engineering=FeatureEngineeringService(self.load_data_config)
+            # feature_engineering.run()
             self.logger.info('Feature engineering completed')
             self.logger.info(f'Training model {model_name}')
             model_trainer=ModelTrainingService(self.training_config_path)
@@ -44,6 +44,6 @@ class TrainingPipeline:
         
 if __name__=="__main__":
     training_pipeline=TrainingPipeline()
-    training_pipeline.train_model()
+    training_pipeline.train_model('mf')
 
 

@@ -48,12 +48,12 @@ class ModelTrainingService:
 
                 # Prepare Data
                 X, indices, itemlist, input_dim = (
-                    self.model_builder.prepare_data_autoencoder(train_df, test_df)
+                    self.model_builder.prepare_data_autoencoder(df)
                 )
 
-                np.save(os.join(self.context_dir,'autoencoder_X.npy'), X)
-                indices.to_csv(os.join(self.context_dir,'autoencoder_indices.csv'))
-                listpath= os.join(self.context_dir,'autoencoder_itemlist.json')
+                np.save(os.path.join(self.context_dir,'autoencoder_X.npy'), X)
+                indices.to_csv(os.path.join(self.context_dir,'autoencoder_indices.csv'))
+                listpath= os.path.join(self.context_dir,'autoencoder_itemlist.json')
                 with open(listpath, "w") as f:
                     json.dump(itemlist, f, indent=4)
                 # Build Model
@@ -70,7 +70,6 @@ class ModelTrainingService:
                     X,
                     epochs=self.config["model_training"]["epochs"],
                     batch_size=self.config["model_training"]["batch_size"],
-                    validation_data=(X_test, X_test),
                     verbose=1,
                 )
 
@@ -104,13 +103,13 @@ class ModelTrainingService:
                     num_users,
                     num_items,
                     user_encoder,
-                    item_emcoder
+                    item_encoder
                 ) = self.model_builder.prepare_data_mf(train_df, test_df)
-                user_encoder_path = os.join(self.context_dir, "mf_user_encoder.pkl")
+                user_encoder_path = os.path.join(self.context_dir, "mf_user_encoder.pkl")
                 with open(user_encoder_path, "wb") as f:
                     pickle.dump(user_encoder, f)
 
-                item_encoder_path = os.join(self.context_dir, "mf_item_encoder.pkl")
+                item_encoder_path = os.path.join(self.context_dir, "mf_item_encoder.pkl")
                 with open(item_encoder_path, "wb") as f:
                     pickle.dump(item_encoder, f)                   
                 # Build Model

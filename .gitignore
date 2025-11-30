@@ -5,3 +5,8 @@ __pycache__
 *.toml
 *.gz
 *.csv
+mlruns/
+*.npy
+*.pkl
+*.json
+*.h5
