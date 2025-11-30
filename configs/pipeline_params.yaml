@@ -1,0 +1,4 @@
+Training_pipeline:
+  data_config_path: "configs/config.yaml"
+  training_config_path: "configs/model_params.yaml"
+  

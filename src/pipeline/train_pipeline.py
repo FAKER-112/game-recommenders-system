@@ -14,9 +14,9 @@ class TrainingPipeline:
     def __init__(self, config_path:str ='configs/pipeline_params.yaml'):
         self.config= load_config(config_path)
         self.logger = logger
-        self.model_config= self.config.get('Training_pipeline')
-        self.load_data_config= self.model_config.get("data_config_path","configs/model_params.yaml")
-        self.training_config_path= self.model_config.get("training_config_path","configs/model_params.yaml")
+        pipeline_config= self.config.get('Training_pipeline',{})
+        self.load_data_config= pipeline_config.get("data_config_path","configs/config.yaml")
+        self.training_config_path= pipeline_config.get("training_config_path","configs/model_params.yaml")
 
     def train_model(self, model_name:str='autoencoder'):
         try:

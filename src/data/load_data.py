@@ -15,8 +15,8 @@ class LoadDataService:
 
             # Store URLs in a list for easier iteration
             self.urls = [
-                load_cfg.get("user_item_dataset_download_url"),
-                load_cfg.get("steam_game_dataset_download_url")
+                load_cfg.get("user_item_dataset_download_url","https://mcauleylab.ucsd.edu/public_datasets/data/steam/australian_users_items.json.gz"),
+                load_cfg.get("steam_game_dataset_download_url", "https://cseweb.ucsd.edu/~wckang/steam_games.json.gz")
             ]
             self.raw_data_dir = load_cfg.get("raw_data_dir", "data/raw")
 
@@ -34,10 +34,10 @@ class LoadDataService:
             self.logger.info("Starting data ingestion process...")
             
             for url in self.urls:
-                if not url:
-                    self.logger.warning("Encountered empty URL in configuration. Skipping.")
-                    continue
-
+                # if not url:
+                #     self.logger.warning("Encountered empty URL in configuration. Skipping.")
+                #     continue
+                self.logger.info(f'url={url}')
                 filename = url.split('/')[-1]
                 file_path = os.path.join(self.raw_data_dir, filename)
 

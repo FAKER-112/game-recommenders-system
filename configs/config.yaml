@@ -1,4 +1,4 @@
-# Project Title
+
 
 data_ingestion:
   user_item_dataset_download_url: "https://mcauleylab.ucsd.edu/public_datasets/data/steam/australian_users_items.json.gz"
@@ -8,7 +8,7 @@ data_ingestion:
 data_cleaning:
   processed_dir: "data/processed"
   raw_data_dir: 'data/raw'
-  raw_files: [australian_users_items.json.gz,steam_games.json.gz]
+  raw_files: ["australian_users_items.json.gz","steam_games.json.gz"]
 
 feature_engineering:
   root_dir: "data/processed"

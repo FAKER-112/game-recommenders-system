@@ -37,6 +37,8 @@ class CleanDataService:
             self.steam_games_path = os.path.join(
                 self.raw_data_dir, self.steam_games_filename
             )
+            print("User items filename:", self.user_items_filename)
+            print("Steam games filename:", self.steam_games_filename)
 
             if not os.path.exists(self.user_items_path):
                 raise FileNotFoundError(f"File {self.user_items_path} does not exist")
