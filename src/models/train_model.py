@@ -147,12 +147,14 @@ class ModelTrainingService:
 
     def train_tfrs(self):
         try:
+
             self.logger.info("Starting TFRS training...")
             with mlflow.start_run(run_name="TFRS_Retrieval"):
                 # Load Data
                 train_df = pd.read_csv(self.transformed_train_path)
                 test_df = pd.read_csv(self.transformed_test_path)
-
+                train_df = train_df[:10000]
+                test_df= test_df[:1000]
                 # Prepare Data
                 data_dict = self.model_builder.prepare_data_tfrs(train_df, test_df)
 

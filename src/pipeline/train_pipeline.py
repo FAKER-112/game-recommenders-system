@@ -1,5 +1,7 @@
 import os 
 import sys
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 from src.models.train_model import ModelTrainingService
@@ -44,6 +46,6 @@ class TrainingPipeline:
         
 if __name__=="__main__":
     training_pipeline=TrainingPipeline()
-    training_pipeline.train_model('mf')
+    training_pipeline.train_model('tfrs')
 
 

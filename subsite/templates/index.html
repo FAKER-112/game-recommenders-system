@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Data Explorer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .game-card:hover { transform: translateY(-5px); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-gray-100 min-h-screen">
+
+    <!-- Navigation -->
+    <nav class="border-b border-slate-700 bg-slate-800 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <i class="fa-brands fa-steam text-3xl text-blue-500"></i>
+                    <span class="font-bold text-xl tracking-tight">Steam<span class="text-blue-500">Explorer</span></span>
+                </div>
+                <div>
+                    <span class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-700">JSON/Python Parser</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" id="app">
+        
+        <!-- Stats Dashboard -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div class="text-slate-400 text-sm mb-1">Total Games</div>
+                <div class="text-2xl font-bold text-white" id="stat-total">0</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div class="text-slate-400 text-sm mb-1">Free Games</div>
+                <div class="text-2xl font-bold text-emerald-400" id="stat-free">0</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div class="text-slate-400 text-sm mb-1">Avg Price (Paid)</div>
+                <div class="text-2xl font-bold text-blue-400" id="stat-avg">$0.00</div>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+                <div class="text-slate-400 text-sm mb-1">Unique Genres</div>
+                <div class="text-2xl font-bold text-purple-400" id="stat-genres">0</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex flex-col md:flex-row gap-4 mb-8 items-center justify-between bg-slate-800 p-4 rounded-xl border border-slate-700">
+            <div class="relative w-full md:w-96">
+                <i class="fa-solid fa-search absolute left-3 top-3.5 text-slate-500"></i>
+                <input type="text" id="search-input" placeholder="Search titles..." 
+                    class="w-full bg-slate-900 border border-slate-600 rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder-slate-500">
+            </div>
+            <div class="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide" id="genre-filters">
+                <button onclick="filterGenre('all')" class="genre-btn active px-4 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap">All</button>
+                <!-- Genre buttons injected via JS -->
+            </div>
+        </div>
+
+        <!-- Loader -->
+        <div id="loader" class="flex justify-center py-20">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        </div>
+
+        <!-- Grid -->
+        <div id="games-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Cards injected via JS -->
+        </div>
+        
+        <!-- Empty State -->
+        <div id="no-results" class="hidden text-center py-20">
+            <i class="fa-solid fa-ghost text-4xl text-slate-600 mb-4"></i>
+            <p class="text-slate-400">No games found matching your criteria.</p>
+        </div>
+
+    </main>
+
+    <script>
+        let allGames = [];
+        let activeGenre = 'all';
+
+        // --- Fetch Data ---
+        async function init() {
+            try {
+                // Fetch Stats
+                const statsRes = await fetch('/api/stats');
+                const stats = await statsRes.json();
+                updateStats(stats);
+
+                // Fetch Games
+                const gamesRes = await fetch('/api/games');
+                allGames = await gamesRes.json();
+                
+                populateGenres();
+                renderGames(allGames);
+                
+                document.getElementById('loader').classList.add('hidden');
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.getElementById('loader').innerHTML = '<span class="text-red-500">Error loading data. Is the backend running?</span>';
+            }
+        }
+
+        // --- UI Updates ---
+        function updateStats(stats) {
+            document.getElementById('stat-total').textContent = stats.total;
+            document.getElementById('stat-free').textContent = stats.free;
+            document.getElementById('stat-avg').textContent = '$' + stats.avg_price;
+            document.getElementById('stat-genres').textContent = stats.genres;
+        }
+
+        function populateGenres() {
+            const genres = new Set();
+            allGames.forEach(game => {
+                if(game.genres) game.genres.forEach(g => genres.add(g));
+            });
+            
+            const container = document.getElementById('genre-filters');
+            Array.from(genres).sort().forEach(g => {
+                const btn = document.createElement('button');
+                btn.className = `genre-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors whitespace-nowrap border border-slate-600`;
+                btn.textContent = g;
+                btn.onclick = () => filterGenre(g, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        function renderGames(games) {
+            const grid = document.getElementById('games-grid');
+            const noRes = document.getElementById('no-results');
+            grid.innerHTML = '';
+
+            if (games.length === 0) {
+                noRes.classList.remove('hidden');
+                return;
+            } else {
+                noRes.classList.add('hidden');
+            }
+
+            games.forEach(game => {
+                const isFree = game.price === 0;
+                const priceDisplay = isFree ? 'Free' : `$${game.price.toFixed(2)}`;
+                const priceClass = isFree ? 'text-emerald-400' : 'text-blue-400';
+                
+                // Truncate tags
+                const tagsHtml = (game.tags || []).slice(0, 3).map(tag => 
+                    `<span class="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300 border border-slate-600">${tag}</span>`
+                ).join('');
+
+                const card = document.createElement('div');
+                card.className = 'game-card bg-slate-800 rounded-xl overflow-hidden border border-slate-700 shadow-lg flex flex-col transition-all duration-300';
+                card.innerHTML = `
+                    <div class="h-32 bg-slate-900 relative overflow-hidden group">
+                        <!-- Placeholder Gradient since images aren't in sample -->
+                        <div class="absolute inset-0 bg-gradient-to-br from-blue-900 to-slate-900 flex items-center justify-center">
+                            <i class="fa-solid fa-gamepad text-4xl text-slate-700 group-hover:text-blue-500 transition-colors"></i>
+                        </div>
+                        <div class="absolute top-2 right-2">
+                             ${game.sentiment && game.sentiment !== 'No reviews' 
+                                ? `<span class="bg-black/50 backdrop-blur text-[10px] px-2 py-1 rounded text-white border border-slate-600"><i class="fa-solid fa-thumbs-up mr-1 text-xs"></i>${game.sentiment}</span>` 
+                                : ''}
+                        </div>
+                    </div>
+                    <div class="p-4 flex-1 flex flex-col">
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-lg leading-tight line-clamp-2 text-white" title="${game.title}">${game.title}</h3>
+                        </div>
+                        <div class="flex flex-wrap gap-1 mb-3">
+                            ${tagsHtml}
+                        </div>
+                        <div class="mt-auto pt-3 border-t border-slate-700 flex justify-between items-center">
+                            <span class="text-xs text-slate-400 truncate w-1/2" title="${game.developer}">${game.developer}</span>
+                            <span class="font-bold ${priceClass}">${priceDisplay}</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // --- Filtering Logic ---
+        function filter() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            
+            const filtered = allGames.filter(game => {
+                const matchesSearch = game.title.toLowerCase().includes(query) || 
+                                      (game.developer && game.developer.toLowerCase().includes(query));
+                const matchesGenre = activeGenre === 'all' || (game.genres && game.genres.includes(activeGenre));
+                
+                return matchesSearch && matchesGenre;
+            });
+
+            renderGames(filtered);
+        }
+
+        function filterGenre(genre, btn) {
+            activeGenre = genre;
+            
+            // Update button styles
+            document.querySelectorAll('.genre-btn').forEach(b => {
+                b.className = `genre-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors whitespace-nowrap border border-slate-600`;
+            });
+            
+            if (btn) {
+                btn.className = `genre-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap border border-blue-500 shadow-lg shadow-blue-500/20`;
+            } else {
+                // Reset 'All' button style
+                document.querySelector('.genre-btn').className = `genre-btn px-4 py-1.5 rounded-full text-xs font-semibold bg-blue-600 text-white hover:bg-blue-500 transition-colors whitespace-nowrap border border-blue-500 shadow-lg shadow-blue-500/20`;
+            }
+
+            filter();
+        }
+
+        document.getElementById('search-input').addEventListener('input', filter);
+
+        // Start
+        init();
+    </script>
+</body>
+</html>

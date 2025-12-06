@@ -21,7 +21,7 @@ class ModelEvaluationService:
     '''
     This class is used to evaluate the models.
     '''
-    def __init__(self, config_path: str = "configs/config.yaml"):
+    def __init__(self, config_path: str = "configs/model_params.yaml"):
         '''
         This function is used to initialize the ModelEvaluationService class.
         '''
@@ -29,6 +29,7 @@ class ModelEvaluationService:
             self.config = load_config(config_path)
             self.logger = logger
 
+            # Load model training config
             model_cfg = self.config.get("model_training", {})
             self.root_dir = model_cfg.get("root_dir", "models")
             self.transformed_train_path = model_cfg.get("transformed_train_path")
@@ -103,19 +104,19 @@ class ModelEvaluationService:
             ndcgs.append(calculate_ndcg_at_k(recommended_ids, relevant_items, k))
 
         return {
-            f"Precision@{k}": np.mean(precisions) if precisions else 0.0,
-            f"MAP@{k}": np.mean(maps) if maps else 0.0,
-            f"NDCG@{k}": np.mean(ndcgs) if ndcgs else 0.0,
+            f"Precision-{k}": np.mean(precisions) if precisions else 0.0,
+            f"MAP-{k}": np.mean(maps) if maps else 0.0,
+            f"NDCG-{k}": np.mean(ndcgs) if ndcgs else 0.0,
         }
 
     def evaluate_mf_model(self, k=10, sample_size=100):
         try:
             self.logger.info("Starting Matrix Factorization Evaluation...")
-
+            self.logger.info(self.transformed_train_path)
             train_df_raw = pd.read_csv(self.transformed_train_path)
             test_df_raw = pd.read_csv(self.transformed_test_path)
 
-            train_user_ids, train_item_ids, test_user_ids, test_item_ids, _, _ = (
+            train_user_ids, train_item_ids, test_user_ids, test_item_ids, _, _, _, _= (
                 self.model_builder.prepare_data_mf(train_df_raw, test_df_raw)
             )
 
@@ -141,7 +142,9 @@ class ModelEvaluationService:
                 self.logger.warning(f"Model not found at {model_path}. Skipping.")
                 return
 
-            model = tf.keras.models.load_model(model_path)
+            model = tf.keras.models.load_model(model_path, compile=False)
+            model.compile(optimizer="adam", loss="mse")
+
 
             # Define prediction function for MF
             def mf_predict(user_id, candidates):
@@ -368,4 +371,4 @@ class ModelEvaluationService:
 
 if __name__ == "__main__":
     evaluator = ModelEvaluationService()
-    evaluator.evaluate_all_models()
+    evaluator.run("mf")

@@ -47,23 +47,26 @@ class ModelBuilder:
 
     def prepare_data_autoencoder(
         self, df: pd.DataFrame
-    ) -> Tuple[np.ndarray, pd.Series,list, int]:
+    ) -> Tuple[np.ndarray, pd.Series, list, int]:
         """
         Prepares data for the Autoencoder model using TF-IDF on item text.
         """
         # Create unique game dataframes for content extraction
         train_content = df.drop_duplicates(subset="item_name").reset_index(drop=True)
-        indices = pd.Series(train_content.index, index=train_content['item_name']).drop_duplicates()
-        
+        indices = pd.Series(
+            train_content.index, index=train_content["item_name"]
+        ).drop_duplicates()
+
         # Convert text to numbers (TF-IDF)
         tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
         tfidf.fit(train_content["item_text"].fillna(""))
         X = tfidf.transform(train_content["item_text"].fillna("")).toarray()
-        
+
         input_dim = X.shape[1]
-        global_item_names = train_content['item_name'].tolist()
+        global_item_names = train_content["item_name"].tolist()
 
         return X, indices, global_item_names, input_dim
+
     def build_autoencoder_model(self, input_dim: int, encoding_dim: int = 64) -> Model:
         """
         Builds an Autoencoder Neural Network.
@@ -128,7 +131,7 @@ class ModelBuilder:
             num_users,
             num_items,
             user_encoder,
-            item_encoder
+            item_encoder,
         )
 
     def build_mf_model(
@@ -220,7 +223,9 @@ class ModelBuilder:
         text_vectorizer = tf.keras.layers.TextVectorization(max_tokens=10000)
         text_vectorizer.adapt(items.map(lambda x: x["item_text"]))
         all_df = pd.concat([train_df, test_df])
-        unique_items_df = all_df.drop_duplicates(subset=['item_name'])[['item_name', 'item_text']]
+        unique_items_df = all_df.drop_duplicates(subset=["item_name"])[
+            ["item_name", "item_text"]
+        ]
         return {
             "train_ds": train_ds,
             "test_ds": test_ds,
@@ -228,7 +233,7 @@ class ModelBuilder:
             "user_ids_vocabulary": user_ids_vocabulary,
             "item_titles_vocabulary": item_titles_vocabulary,
             "text_vectorizer": text_vectorizer,
-            "unique_items_df": unique_items_df
+            "unique_items_df": unique_items_df,
         }
 
     def build_tfrs_model(self, data_dict: Dict[str, Any]) -> tfrs.Model:
@@ -279,10 +284,21 @@ class ModelBuilder:
                     [tf.keras.layers.Dense(64, activation="relu")]
                 )
 
-            def call(self, titles, texts):
+            def call(self, inputs):
+                # Handle dict input from .map() on items dataset
+                if isinstance(inputs, dict):
+                    titles = inputs["item_name"]
+                    texts = inputs["item_text"]
+                else:
+                    # Fallback for direct calls
+                    titles = inputs
+                    texts = None
                 title_emb = self.title_embedding(titles)
-                text_emb = self.text_embedding(texts)
-                concat = tf.concat([title_emb, text_emb], axis=1)
+                if texts is not None:
+                    text_emb = self.text_embedding(texts)
+                    concat = tf.concat([title_emb, text_emb], axis=1)
+                else:
+                    concat = title_emb
                 return self.dense(concat)
 
         # Define Main Model
@@ -301,7 +317,12 @@ class ModelBuilder:
 
             def compute_loss(self, features, training=False):
                 user_emb = self.user_model(features["user_id"])
-                item_emb = self.item_model(features["item_name"], features["item_text"])
+                item_emb = self.item_model(
+                    {
+                        "item_name": features["item_name"],
+                        "item_text": features["item_text"],
+                    }
+                )
                 return self.task(user_emb, item_emb)
 
         return SteamTFRSModel()
