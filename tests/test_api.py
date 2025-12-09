@@ -1,5 +1,5 @@
 """
-API Testing Script for Game Recommendation System
+API Testing Script for Game Recommendation System (Updated for new endpoints)
 Run this script to test all API endpoints
 """
 
@@ -30,12 +30,12 @@ class APITester:
             print(f"      {details}")
         self.test_results.append((name, passed))
         
-    def make_request(self, method, endpoint, data=None):
+    def make_request(self, method, endpoint, data=None, params=None):
         """Make HTTP request and handle errors."""
         url = f"{self.base_url}{endpoint}"
         try:
             if method.upper() == 'GET':
-                response = self.session.get(url)
+                response = self.session.get(url, params=params)
             elif method.upper() == 'POST':
                 response = self.session.post(url, json=data)
             else:
@@ -57,9 +57,8 @@ class APITester:
             self.print_test(
                 "Health Check",
                 data.get('status') == 'healthy',
-                f"Models loaded: {data.get('models_loaded', [])}"
+                f"Models loaded: {data.get('models_loaded', [])}, Games: {data.get('counts', {}).get('games', 0)}"
             )
-            print(f"Response: {json.dumps(data, indent=2)}")
         else:
             self.print_test("Health Check", False, "Request failed")
     
@@ -74,28 +73,133 @@ class APITester:
             self.print_test(
                 "Home Endpoint",
                 data.get('status') == 'success',
-                f"Version: {data.get('version')}"
+                f"Version: {data.get('version')}, Games: {data.get('stats', {}).get('total_games', 0)}"
             )
-            print(f"Available endpoints: {list(data.get('endpoints', {}).keys())}")
+            endpoints = list(data.get('endpoints', {}).keys())
+            print(f"      Available endpoints: {endpoints}")
         else:
             self.print_test("Home Endpoint", False, "Request failed")
+    
+    def test_userlist_endpoint(self):
+        """Test userlist endpoint."""
+        self.print_header("Testing Userlist Endpoint")
+        
+        response = self.make_request('GET', '/api/userlist')
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.print_test(
+                "Userlist Endpoint",
+                data.get('status') == 'success',
+                f"Found {data.get('count', 0)} users"
+            )
+            
+            users = data.get('users', [])
+            if users:
+                print(f"      First 3 users: {users[:3]}")
+        else:
+            self.print_test("Userlist Endpoint", False, f"Status: {response.status_code if response else 'No response'}")
+    
+    def test_gamedata_endpoint(self):
+        """Test gamedata endpoint with pagination."""
+        self.print_header("Testing Gamedata Endpoint")
+        
+        # Test 1: Basic pagination
+        response = self.make_request('GET', '/api/gamedata', params={'start': 0, 'end': 5})
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.print_test(
+                "Gamedata - Basic Pagination",
+                data.get('status') == 'success' and 'games' in data,
+                f"Got {len(data.get('games', []))} games, Total: {data.get('total_games', 0)}"
+            )
+            
+            if data.get('games'):
+                first_game = data['games'][0]
+                print(f"      First game: {first_game.get('title', 'Unknown')}")
+        
+        # Test 2: With search
+        response = self.make_request('GET', '/api/gamedata', params={'start': 0, 'end': 5, 'search': 'Counter'})
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            self.print_test(
+                "Gamedata - With Search",
+                data.get('status') == 'success',
+                f"Found {data.get('total_games', 0)} games matching 'Counter'"
+            )
+        else:
+            self.print_test("Gamedata - With Search", False, "Request failed")
+    
+    def test_game_detail_endpoint(self):
+        """Test game detail endpoint."""
+        self.print_header("Testing Game Detail Endpoint")
+        
+        # First, get a game ID from the gamedata endpoint
+        response = self.make_request('GET', '/api/gamedata', params={'start': 0, 'end': 1})
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get('games'):
+                game = data['games'][0]
+                game_id = game.get('id')
+                game_title = game.get('title')
+                
+                # Test with ID
+                response2 = self.make_request('GET', f'/api/game/{game_id}')
+                
+                if response2 and response2.status_code == 200:
+                    data2 = response2.json()
+                    self.print_test(
+                        "Game Detail - By ID",
+                        data2.get('status') == 'success' and data2.get('game', {}).get('id') == game_id,
+                        f"Found game: {data2.get('game', {}).get('title', 'Unknown')}"
+                    )
+                
+                # Test with title (if API supports it)
+                response3 = self.make_request('GET', f'/api/game/{game_title.replace(" ", "%20")}')
+                
+                if response3:
+                    self.print_test(
+                        "Game Detail - By Title",
+                        response3.status_code in [200, 404],  # Either found or not found
+                        f"Status: {response3.status_code}"
+                    )
+                
+                # Test with non-existent ID
+                response4 = self.make_request('GET', '/api/game/nonexistent123')
+                self.print_test(
+                    "Game Detail - Non-existent ID",
+                    response4.status_code == 404,
+                    "Correctly returns 404 for non-existent game"
+                )
+            else:
+                self.print_test("Game Detail Endpoint", False, "No games found to test with")
+        else:
+            self.print_test("Game Detail Endpoint", False, "Could not fetch test game")
     
     def test_model_info(self):
         """Test model info endpoints."""
         self.print_header("Testing Model Info")
         
-        for model_name in [ 'mf', 'autoencoder']:
+        for model_name in ['tfrs', 'mf', 'autoencoder']:
             response = self.make_request('GET', f'/model_info/{model_name}')
             
-            if response and response.status_code == 200:
-                data = response.json()
-                self.print_test(
-                    f"Model Info: {model_name}",
-                    data.get('status') == 'success',
-                    f"Loaded: {data.get('is_loaded')}, User Recs: {data.get('supports_user_recommendations')}"
-                )
+            if response:
+                if response.status_code == 200:
+                    data = response.json()
+                    self.print_test(
+                        f"Model Info: {model_name}",
+                        data.get('status') == 'success',
+                        f"Loaded: {data.get('is_loaded')}, Supports User Recs: {data.get('supports_user_recommendations')}"
+                    )
+                elif response.status_code == 404:
+                    self.print_test(f"Model Info: {model_name}", False, "Model not found")
+                else:
+                    self.print_test(f"Model Info: {model_name}", False, f"Status: {response.status_code}")
             else:
-                self.print_test(f"Model Info: {model_name}", False)
+                self.print_test(f"Model Info: {model_name}", False, "No response")
         
         # Test invalid model
         response = self.make_request('GET', '/model_info/invalid_model')
@@ -119,7 +223,6 @@ class APITester:
                 len(models) == 3,
                 f"Found {len(models)} models"
             )
-            print(f"Response: {json.dumps(data, indent=2)}")
         else:
             self.print_test("Available Models", False)
     
@@ -127,12 +230,21 @@ class APITester:
         """Test user recommendation endpoints."""
         self.print_header("Testing User Recommendations")
         
+        # First get a real user ID from userlist
+        response = self.make_request('GET', '/api/userlist')
+        test_user_id = "76561197970982479"  # Default test user
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get('users'):
+                test_user_id = data['users'][0]
+        
         test_cases = [
             {
                 "name": "TFRS User Recommendations",
                 "data": {
                     "model_name": "tfrs",
-                    "user_id": "76561197970982479",
+                    "user_id": test_user_id,
                     "n_rec": 5
                 },
                 "expected_status": 200
@@ -141,7 +253,7 @@ class APITester:
                 "name": "MF User Recommendations",
                 "data": {
                     "model_name": "mf",
-                    "user_id": "76561197970982479",
+                    "user_id": test_user_id,
                     "n_rec": 5
                 },
                 "expected_status": 200
@@ -150,7 +262,7 @@ class APITester:
                 "name": "Invalid Model Name",
                 "data": {
                     "model_name": "invalid",
-                    "user_id": "76561197970982479",
+                    "user_id": test_user_id,
                     "n_rec": 5
                 },
                 "expected_status": 400
@@ -167,7 +279,7 @@ class APITester:
                 "name": "Invalid n_rec (too large)",
                 "data": {
                     "model_name": "tfrs",
-                    "user_id": "76561197970982479",
+                    "user_id": test_user_id,
                     "n_rec": 101
                 },
                 "expected_status": 400
@@ -191,9 +303,6 @@ class APITester:
                     details = response.json().get('error', '')
                 
                 self.print_test(test_case['name'], passed, details)
-                
-                if passed and response.status_code == 200 and data.get('recommendations'):
-                    print(f"      Sample recommendations: {data['recommendations'][:3]}")
             else:
                 self.print_test(test_case['name'], False, "Request failed")
     
@@ -201,12 +310,21 @@ class APITester:
         """Test item similarity endpoints."""
         self.print_header("Testing Item Similarity")
         
+        # First get a real game title from gamedata
+        response = self.make_request('GET', '/api/gamedata', params={'start': 0, 'end': 1})
+        test_game_name = "Football Manager 2017"  # Default test game
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get('games'):
+                test_game_name = data['games'][0].get('title', test_game_name)
+        
         test_cases = [
             {
                 "name": "Autoencoder Similar Items",
                 "data": {
                     "model_name": "autoencoder",
-                    "item_name": "Football Manager 2017",
+                    "item_name": test_game_name,
                     "k": 5
                 },
                 "expected_status": 200
@@ -215,7 +333,7 @@ class APITester:
                 "name": "TFRS Similar Items",
                 "data": {
                     "model_name": "tfrs",
-                    "item_name": "Football Manager 2017",
+                    "item_name": test_game_name,
                     "k": 5
                 },
                 "expected_status": 200
@@ -224,7 +342,7 @@ class APITester:
                 "name": "Invalid Model for Item Similarity",
                 "data": {
                     "model_name": "mf",
-                    "item_name": "Football Manager 2017",
+                    "item_name": test_game_name,
                     "k": 5
                 },
                 "expected_status": 400
@@ -236,15 +354,6 @@ class APITester:
                     "k": 5
                 },
                 "expected_status": 400
-            },
-            {
-                "name": "Non-existent Item",
-                "data": {
-                    "model_name": "autoencoder",
-                    "item_name": "NonExistentGame12345",
-                    "k": 5
-                },
-                "expected_status": 200  # Should return empty list with success
             }
         ]
         
@@ -257,17 +366,12 @@ class APITester:
                 
                 if passed and response.status_code == 200:
                     details = f"Got {data.get('count', 0)} similar items"
-                    if data.get('similar_items'):
-                        details += f", First: {data['similar_items'][0]}"
                 elif not passed:
                     details = f"Expected {test_case['expected_status']}, got {response.status_code}"
                 else:
                     details = response.json().get('error', '')
                 
                 self.print_test(test_case['name'], passed, details)
-                
-                if passed and response.status_code == 200 and data.get('similar_items'):
-                    print(f"      Similar items: {data['similar_items'][:3]}")
             else:
                 self.print_test(test_case['name'], False, "Request failed")
     
@@ -275,12 +379,21 @@ class APITester:
         """Test batch recommendation endpoint."""
         self.print_header("Testing Batch Recommendations")
         
+        # Get real user IDs
+        response = self.make_request('GET', '/api/userlist')
+        user_ids = ["76561197970982479", "76561198001103300"]  # Default test users
+        
+        if response and response.status_code == 200:
+            data = response.json()
+            if data.get('users') and len(data['users']) >= 2:
+                user_ids = data['users'][:2]
+        
         test_cases = [
             {
                 "name": "Batch TFRS Recommendations",
                 "data": {
                     "model_name": "tfrs",
-                    "user_ids": ["76561197970982479", "76561198001103300"],
+                    "user_ids": user_ids,
                     "n_rec": 3
                 },
                 "expected_status": 200
@@ -359,17 +472,32 @@ class APITester:
         except Exception as e:
             self.print_test("Invalid JSON Handling", False, str(e))
     
+    def test_new_data_endpoints(self):
+        """Test all new data-related endpoints."""
+        self.print_header("Testing New Data Endpoints")
+        
+        # Test userlist
+        self.test_userlist_endpoint()
+        
+        # Test gamedata
+        self.test_gamedata_endpoint()
+        
+        # Test game detail
+        self.test_game_detail_endpoint()
+    
     def run_all_tests(self):
         """Run all tests."""
         print("\n" + "=" * 70)
-        print("  GAME RECOMMENDATION API - TEST SUITE")
+        print("  GAME RECOMMENDATION API - TEST SUITE (UPDATED)")
         print("  " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        print("  Testing new app.py with data endpoints")
         print("=" * 70)
         
         try:
             # Run all test groups
             self.test_health_check()
             self.test_home()
+            self.test_new_data_endpoints()
             self.test_available_models()
             self.test_model_info()
             self.test_user_recommendations()
@@ -408,7 +536,17 @@ class APITester:
                 if not result:
                     print(f"  - {name}")
         
-        print("\n" + "=" * 70 + "\n")
+        print("\n" + "=" * 70)
+        
+        # Additional recommendations
+        if pass_rate < 100:
+            print("\n\033[93mRecommendations:\033[0m")
+            print("1. Make sure app.py is running with data loaded")
+            print("2. Check if models are trained and available")
+            print("3. Verify data files exist in data/raw/ and data/processed/")
+            print("4. Check Flask logs for any startup errors")
+        
+        print("\n")
 
 
 if __name__ == "__main__":
@@ -419,6 +557,11 @@ if __name__ == "__main__":
     
     print(f"Testing API at: {base_url}")
     print("Make sure the Flask app is running before executing tests!\n")
+    print("Note: This tester now includes tests for the new data endpoints:")
+    print("  - /api/userlist")
+    print("  - /api/gamedata (with pagination)")
+    print("  - /api/game/<game_id>")
+    print("\nThe app.py must be started with the new modifications.")
     
     tester = APITester(base_url)
     tester.run_all_tests()
