@@ -46,6 +46,6 @@ class TrainingPipeline:
         
 if __name__=="__main__":
     training_pipeline=TrainingPipeline()
-    training_pipeline.train_model('tfrs')
+    training_pipeline.train_model('mf')
 
 

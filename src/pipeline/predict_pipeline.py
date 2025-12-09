@@ -1,4 +1,5 @@
 import os
+import sys
 import pickle
 import json
 import pandas as pd
@@ -8,6 +9,8 @@ import tensorflow_recommenders as tfrs
 from tensorflow.keras.models import load_model, Model
 from sklearn.metrics.pairwise import cosine_similarity
 from pathlib import Path
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(project_root)
 from src.utils.exception import CustomException
 from src.utils.logger import logger
 from src.utils.utils import load_config
@@ -43,8 +46,18 @@ class PredictionPipeline:
         """Loads the specified model."""
         try:
             if self.model_name == "mf":
+                from tensorflow.keras.metrics import MeanSquaredError
+                from tensorflow.keras.losses import MeanSquaredError as MSELoss
                 model_path = os.path.join(self.root_dir, "mf_model.h5")
-                self.model = load_model(model_path)
+                self.model = load_model(
+                    model_path,
+                    custom_objects={
+                        'mse': MSELoss,
+                        'loss': MSELoss,
+                        # Note: The compiled loss "mse" is the issue, often aliased to MeanSquaredError in the internal state.
+                        # Including both can help resolve the path.
+                    }
+                )
                 self.logger.info(f"Loaded MF model from {model_path}")
                 
             elif self.model_name == "autoencoder":

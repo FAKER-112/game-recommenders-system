@@ -159,7 +159,7 @@ class ModelBuilder:
         dot_product = layers.Dot(axes=1)([user_vec, game_vec])
 
         # Output
-        output = layers.Dense(1, activation="sigmoid")(dot_product)
+        output = layers.Dense(1)(dot_product)
 
         model = Model(inputs=[user_input, game_input], outputs=output)
         model.compile(optimizer="adam", loss="mse")

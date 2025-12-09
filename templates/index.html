@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steam Game Recommender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --steam-dark: #1b2838;
+            --steam-darker: #171a21;
+            --steam-blue: #1a9fff;
+            --steam-light-blue: #66c0f4;
+            --steam-green: #5cb85c;
+            --card-bg: #16202d;
+            --text-light: #c7d5e0;
+            --text-muted: #8f98a0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--steam-darker) 0%, var(--steam-dark) 100%);
+            color: var(--text-light);
+            min-height: 100vh;
+        }
+
+        /* Navigation */
+        nav {
+            background: var(--steam-darker);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--steam-light-blue);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-selector {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .user-selector select {
+            padding: 0.5rem 1rem;
+            background: var(--card-bg);
+            color: var(--text-light);
+            border: 1px solid var(--steam-blue);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            min-width: 200px;
+        }
+
+        .user-selector select:hover {
+            border-color: var(--steam-light-blue);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, rgba(26, 159, 255, 0.1) 0%, rgba(102, 192, 244, 0.05) 100%);
+            padding: 3rem 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--steam-light-blue), var(--steam-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: var(--steam-light-blue);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--steam-blue);
+        }
+
+        .section-header h2 {
+            font-size: 1.8rem;
+            color: var(--steam-light-blue);
+        }
+
+        .model-badge {
+            background: var(--steam-blue);
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        /* Game Grid */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .game-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--steam-light-blue);
+            box-shadow: 0 10px 30px rgba(26, 159, 255, 0.3);
+        }
+
+        .game-image {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #1e3a52, #2d4f6b);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .game-image::before {
+            content: '🎮';
+            position: absolute;
+            font-size: 4rem;
+            opacity: 0.2;
+        }
+
+        .game-info {
+            padding: 1rem;
+        }
+
+        .game-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: var(--text-light);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .game-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+            min-height: 40px;
+        }
+
+        .tag {
+            background: rgba(26, 159, 255, 0.2);
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            color: var(--steam-light-blue);
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .game-price {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.8rem;
+            padding-top: 0.8rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .price {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--steam-green);
+        }
+
+        .discount-price {
+            color: var(--text-muted);
+            text-decoration: line-through;
+            font-size: 0.9rem;
+            margin-left: 0.5rem;
+        }
+
+        /* Game Detail Page */
+        .game-detail {
+            display: none;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+
+        .game-detail-header {
+            background: linear-gradient(135deg, #1e3a52, #2d4f6b);
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--steam-light-blue);
+            color: var(--text-light);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .back-button:hover {
+            background: var(--steam-blue);
+        }
+
+        .game-detail-title {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .game-detail-content {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .detail-sidebar {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1.5rem;
+            border-radius: 8px;
+            height: fit-content;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-section h3 {
+            color: var(--steam-light-blue);
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .detail-section p {
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .detail-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .info-label {
+            color: var(--text-muted);
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .buy-button {
+            width: 100%;
+            padding: 1rem;
+            background: var(--steam-green);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 1rem;
+        }
+
+        .buy-button:hover {
+            background: #4ca94c;
+            transform: translateY(-2px);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Show More Button */
+        .show-more-container {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .show-more-button {
+            padding: 0.8rem 2rem;
+            background: var(--steam-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .show-more-button:hover {
+            background: var(--steam-light-blue);
+            transform: translateY(-2px);
+        }
+
+        .show-more-button:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Search Bar */
+        .search-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.8rem 1rem;
+            background: var(--card-bg);
+            color: var(--text-light);
+            border: 1px solid var(--steam-blue);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .search-button {
+            padding: 0.8rem 1.5rem;
+            background: var(--steam-blue);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-button:hover {
+            background: var(--steam-light-blue);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .game-grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            }
+
+            .game-detail-content {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .user-selector {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: var(--card-bg);
+            border: 2px solid var(--steam-blue);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.error {
+            border-color: #dc3545;
+        }
+
+        .notification.success {
+            border-color: var(--steam-green);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-content">
+            <div class="logo">
+                🎮 Steam Game Recommender
+            </div>
+            <div class="user-selector">
+                <label for="userSelect">Play as:</label>
+                <select id="userSelect">
+                    <option value="">Select a user...</option>
+                </select>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Hero Section -->
+        <div class="hero" id="heroSection">
+            <h1>Discover Your Next Favorite Game</h1>
+            <p>Powered by AI • Personalized for You • Explore Thousands of Games</p>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+
+        <!-- Home Page -->
+        <div id="homePage">
+            <!-- For You Section (Recommendations) -->
+            <div class="section-header">
+                <h2>For You</h2>
+                <span class="model-badge" id="modelBadge">TFRS Model</span>
+            </div>
+            <div class="game-grid" id="recommendationsGrid"></div>
+            <div id="recommendationsEmptyState" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">🎯</div>
+                <h2>Select a User to Get Started</h2>
+                <p>Choose a user from the dropdown above to see personalized recommendations</p>
+            </div>
+
+            <!-- Game List Section -->
+            <div class="section-header">
+                <h2>Game List</h2>
+                <div class="search-container">
+                    <input type="text" id="searchInput" class="search-input"
+                        placeholder="Search games by title, genre, or tag...">
+                    <button id="searchButton" class="search-button">Search</button>
+                    <button id="clearSearch" class="search-button" style="display: none;">Clear</button>
+                </div>
+            </div>
+            <div class="game-grid" id="gameListGrid"></div>
+            <div id="gameListEmptyState" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">🔍</div>
+                <h2>No Games Found</h2>
+                <p>Try a different search term or check back later</p>
+            </div>
+            <div class="show-more-container">
+                <button id="showMoreButton" class="show-more-button" disabled>Show More Games</button>
+            </div>
+        </div>
+
+        <!-- Game Detail Page -->
+        <div id="detailPage" class="game-detail">
+            <div class="game-detail-header">
+                <button class="back-button" onclick="showHomePage()">← Back to Recommendations</button>
+                <h1 class="game-detail-title" id="detailTitle"></h1>
+                <p id="detailDeveloper"></p>
+            </div>
+            <div class="game-detail-content">
+                <div class="detail-main">
+                    <div class="detail-section">
+                        <h3>About This Game</h3>
+                        <div id="detailDescription"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>Genres</h3>
+                        <div class="detail-tags" id="detailGenres"></div>
+                    </div>
+                    <div class="detail-section">
+                        <h3>Tags</h3>
+                        <div class="detail-tags" id="detailTags"></div>
+                    </div>
+                </div>
+                <div class="detail-sidebar">
+                    <div id="detailInfo"></div>
+                    <button class="buy-button" id="buyButton">Visit Steam Store</button>
+                </div>
+            </div>
+
+            <!-- Similar Games Section -->
+            <div style="padding: 0 2rem 2rem;">
+                <div class="section-header">
+                    <h2>Similar Games</h2>
+                    <span class="model-badge">Content-Based</span>
+                </div>
+                <div class="game-grid" id="similarGamesGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://127.0.0.1:5000'; // Relative URL since it's served from same server
+        const ITEMS_PER_PAGE = 10;
+
+        // State
+        let currentUser = null;
+        let currentGameListStart = 0;
+        let totalGames = 0;
+        let searchTerm = '';
+        let gameList = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await loadUserList();
+            await loadInitialGameList();
+            setupEventListeners();
+        });
+
+        // Load user list from API
+        async function loadUserList() {
+            try {
+                showLoading(true);
+                const response = await fetch(`${API_BASE_URL}/api/userlist`);
+                if (!response.ok) throw new Error('Failed to fetch user list');
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    populateUserSelector(data.users);
+                    showNotification(`Loaded ${data.count} users`, 'success');
+                }
+            } catch (error) {
+                console.error('Error loading user list:', error);
+                showNotification('Failed to load user list. Make sure API is running.', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Populate user selector
+        function populateUserSelector(users) {
+            const select = document.getElementById('userSelect');
+            select.innerHTML = '<option value="">Select a user...</option>';
+
+            users.forEach((userId, index) => {
+                const option = document.createElement('option');
+                option.value = userId;
+                option.textContent = `User ${index + 1} (${userId.substring(0, 10)}...)`;
+                select.appendChild(option);
+            });
+        }
+
+        // Load initial game list
+        async function loadInitialGameList() {
+            currentGameListStart = 0;
+            await loadGameList();
+        }
+
+        // Load game list with pagination
+        async function loadGameList() {
+            try {
+                showLoading(true);
+
+                const params = new URLSearchParams({
+                    start: currentGameListStart,
+                    end: currentGameListStart + ITEMS_PER_PAGE
+                });
+
+                if (searchTerm) {
+                    params.append('search', searchTerm);
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/gamedata?${params}`);
+                if (!response.ok) throw new Error('Failed to fetch game list');
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    totalGames = data.total_games;
+
+                    if (currentGameListStart === 0) {
+                        gameList = data.games;
+                        displayGameList(gameList);
+                    } else {
+                        gameList = [...gameList, ...data.games];
+                        displayGameList(gameList);
+                    }
+
+                    // Update show more button
+                    const showMoreButton = document.getElementById('showMoreButton');
+                    showMoreButton.disabled = !data.has_more;
+                    showMoreButton.textContent = data.has_more ? 'Show More Games' : 'No More Games';
+
+                    // Show/hide empty state
+                    const emptyState = document.getElementById('gameListEmptyState');
+                    if (gameList.length === 0) {
+                        emptyState.style.display = 'block';
+                    } else {
+                        emptyState.style.display = 'none';
+                    }
+
+                    if (searchTerm && gameList.length > 0) {
+                        showNotification(`Found ${totalGames} games matching "${searchTerm}"`, 'success');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading game list:', error);
+                showNotification('Failed to load game list', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display game list
+        function displayGameList(games) {
+            const grid = document.getElementById('gameListGrid');
+
+            if (currentGameListStart === 0) {
+                grid.innerHTML = '';
+            }
+
+            games.forEach(game => {
+                const card = createGameCard(game);
+                grid.appendChild(card);
+            });
+        }
+
+        // Load recommendations for a user
+        async function loadRecommendations() {
+            if (!currentUser) return;
+
+            try {
+                showLoading(true);
+
+                const response = await fetch(`${API_BASE_URL}/recommend_user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model_name: 'mf',
+                        user_id: currentUser,
+                        n_rec: 12
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch recommendations');
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    displayRecommendations(data.recommendations_with_details || []);
+
+                    // Show/hide empty state
+                    const emptyState = document.getElementById('recommendationsEmptyState');
+                    if (data.recommendations_with_details.length === 0) {
+                        emptyState.style.display = 'block';
+                    } else {
+                        emptyState.style.display = 'none';
+                    }
+
+                    showNotification(`Loaded ${data.count} recommendations for user ${currentUser}`, 'success');
+                }
+            } catch (error) {
+                console.error('Error loading recommendations:', error);
+                showNotification('Failed to load recommendations', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Display recommendations
+        function displayRecommendations(games) {
+            const grid = document.getElementById('recommendationsGrid');
+            grid.innerHTML = '';
+
+            if (games.length === 0) {
+                const emptyState = document.getElementById('recommendationsEmptyState');
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            games.forEach(game => {
+                const card = createGameCard(game);
+                grid.appendChild(card);
+            });
+        }
+
+        // Create game card
+        function createGameCard(game) {
+            const card = document.createElement('div');
+            card.className = 'game-card';
+            card.onclick = () => showGameDetail(game);
+
+            const genres = Array.isArray(game.genres) ? game.genres.slice(0, 3) : [];
+            const tags = Array.isArray(game.tags) ? game.tags.slice(0, 2) : [];
+
+            // Format price
+            let priceText = 'Free';
+            let discountText = '';
+
+            if (game.price !== undefined && game.price !== null) {
+                if (typeof game.price === 'string' && game.price.toLowerCase().includes('free')) {
+                    priceText = 'Free';
+                } else {
+                    const price = parseFloat(game.price);
+                    const discountPrice = game.discount_price ? parseFloat(game.discount_price) : null;
+
+                    if (!isNaN(price)) {
+                        if (discountPrice && !isNaN(discountPrice)) {
+                            priceText = `$${discountPrice.toFixed(2)}`;
+                            discountText = `$${price.toFixed(2)}`;
+                        } else {
+                            priceText = `$${price.toFixed(2)}`;
+                        }
+                    }
+                }
+            }
+
+            card.innerHTML = `
+                <div class="game-image">
+                    ${getGameIcon(genres[0])}
+                </div>
+                <div class="game-info">
+                    <div class="game-title" title="${game.title}">${game.title}</div>
+                    <div class="game-meta">
+                        ${genres.map(g => `<span class="tag" title="${g}">${g}</span>`).join('')}
+                        ${tags.map(t => `<span class="tag" title="${t}">${t}</span>`).join('')}
+                    </div>
+                    <div class="game-price">
+                        <span class="price">${priceText}</span>
+                        ${discountText ? `<span class="discount-price">${discountText}</span>` : ''}
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Get game icon based on genre
+        function getGameIcon(genre) {
+            const icons = {
+                'Action': '⚔️',
+                'Adventure': '🗺️',
+                'RPG': '🐉',
+                'Strategy': '♟️',
+                'Simulation': '🎮',
+                'Sports': '⚽',
+                'Racing': '🏎️',
+                'Indie': '💡',
+                'Casual': '🎯',
+                'Free to Play': '🎁',
+                'Simulation': '🔧',
+                'Sports': '🏆'
+            };
+            return icons[genre] || '🎮';
+        }
+
+        // Show game detail
+        async function showGameDetail(game) {
+            document.getElementById('homePage').style.display = 'none';
+            document.getElementById('detailPage').style.display = 'block';
+            document.getElementById('heroSection').style.display = 'none';
+
+            // Populate game details
+            document.getElementById('detailTitle').textContent = game.title;
+            document.getElementById('detailDeveloper').textContent = `by ${game.developer || 'Unknown Developer'}`;
+
+            // Generate description
+            const description = `
+                <p>${game.title} is ${game.genres?.length ? 'a ' + game.genres.join(', ') : 'an exciting game'}.</p>
+                ${game.release_date ? `<p>Released on ${game.release_date}.</p>` : ''}
+                ${game.publisher ? `<p>Published by ${game.publisher}.</p>` : ''}
+            `;
+            document.getElementById('detailDescription').innerHTML = description;
+
+            // Genres
+            const genresContainer = document.getElementById('detailGenres');
+            genresContainer.innerHTML = '';
+            (game.genres || []).forEach(genre => {
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                tag.textContent = genre;
+                genresContainer.appendChild(tag);
+            });
+
+            // Tags
+            const tagsContainer = document.getElementById('detailTags');
+            tagsContainer.innerHTML = '';
+            (game.tags || []).forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'tag';
+                tagEl.textContent = tag;
+                tagsContainer.appendChild(tagEl);
+            });
+
+            // Sidebar info
+            const price = parseFloat(game.price) || 0;
+            const discountPrice = game.discount_price ? parseFloat(game.discount_price) : null;
+
+            const infoHTML = `
+                <div class="info-row">
+                    <span class="info-label">Price</span>
+                    <span class="info-value price">
+                        ${discountPrice ? `$${discountPrice.toFixed(2)}` : (price === 0 ? 'Free' : `$${price.toFixed(2)}`)}
+                    </span>
+                </div>
+                ${discountPrice ? `
+                <div class="info-row">
+                    <span class="info-label">Original Price</span>
+                    <span class="info-value discount-price">$${price.toFixed(2)}</span>
+                </div>` : ''}
+                ${game.release_date ? `
+                <div class="info-row">
+                    <span class="info-label">Release Date</span>
+                    <span class="info-value">${game.release_date}</span>
+                </div>` : ''}
+                ${game.developer ? `
+                <div class="info-row">
+                    <span class="info-label">Developer</span>
+                    <span class="info-value">${game.developer}</span>
+                </div>` : ''}
+                ${game.publisher ? `
+                <div class="info-row">
+                    <span class="info-label">Publisher</span>
+                    <span class="info-value">${game.publisher}</span>
+                </div>` : ''}
+                <div class="info-row">
+                    <span class="info-label">Early Access</span>
+                    <span class="info-value">${game.early_access ? 'Yes' : 'No'}</span>
+                </div>
+                ${game.sentiment ? `
+                <div class="info-row">
+                    <span class="info-label">Rating</span>
+                    <span class="info-value">${game.sentiment}</span>
+                </div>` : ''}
+            `;
+            document.getElementById('detailInfo').innerHTML = infoHTML;
+
+            // Buy button
+            const buyButton = document.getElementById('buyButton');
+            if (game.url) {
+                buyButton.onclick = () => window.open(game.url, '_blank');
+                buyButton.textContent = 'Visit Steam Store';
+                buyButton.disabled = false;
+            } else {
+                buyButton.textContent = 'Store Link Not Available';
+                buyButton.disabled = true;
+            }
+
+            // Load similar games
+            await loadSimilarGames(game.title);
+
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+
+        // Load similar games
+        async function loadSimilarGames(gameName) {
+            const grid = document.getElementById('similarGamesGrid');
+            grid.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading similar games...</p></div>';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/recommend_item`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model_name: 'autoencoder',
+                        item_name: gameName,
+                        k: 6
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to fetch similar games');
+
+                const data = await response.json();
+                grid.innerHTML = '';
+
+                if (data.similar_items_with_details && data.similar_items_with_details.length > 0) {
+                    data.similar_items_with_details.forEach(game => {
+                        const card = createGameCard(game);
+                        grid.appendChild(card);
+                    });
+                } else {
+                    grid.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No similar games found</p>';
+                }
+            } catch (error) {
+                console.error('Error loading similar games:', error);
+                grid.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">Failed to load similar games</p>';
+            }
+        }
+
+        // Show home page
+        function showHomePage() {
+            document.getElementById('homePage').style.display = 'block';
+            document.getElementById('detailPage').style.display = 'none';
+            document.getElementById('heroSection').style.display = 'block';
+            window.scrollTo(0, 0);
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
+            document.getElementById('userSelect').addEventListener('change', onUserChange);
+            document.getElementById('showMoreButton').addEventListener('click', onShowMore);
+            document.getElementById('searchButton').addEventListener('click', onSearch);
+            document.getElementById('clearSearch').addEventListener('click', onClearSearch);
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') onSearch();
+            });
+        }
+
+        // User change handler
+        function onUserChange(e) {
+            currentUser = e.target.value;
+            if (!currentUser) {
+                const emptyState = document.getElementById('recommendationsEmptyState');
+                emptyState.style.display = 'block';
+                const grid = document.getElementById('recommendationsGrid');
+                grid.innerHTML = '';
+                return;
+            }
+
+            loadRecommendations();
+        }
+
+        // Show more button handler
+        function onShowMore() {
+            currentGameListStart += ITEMS_PER_PAGE;
+            loadGameList();
+        }
+
+        // Search handler
+        function onSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchTerm = searchInput.value.trim();
+            currentGameListStart = 0;
+
+            // Show clear button
+            const clearButton = document.getElementById('clearSearch');
+            clearButton.style.display = searchTerm ? 'block' : 'none';
+
+            loadGameList();
+        }
+
+        // Clear search handler
+        function onClearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.value = '';
+            searchTerm = '';
+            currentGameListStart = 0;
+
+            const clearButton = document.getElementById('clearSearch');
+            clearButton.style.display = 'none';
+
+            loadGameList();
+        }
+
+        // UI Helper Functions
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+
+</html>
