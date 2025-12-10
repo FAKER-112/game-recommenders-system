@@ -1,3 +1,35 @@
+"""
+Data Cleaning and Merging Module
+
+This script defines the CleanDataService class, which is responsible for processing
+raw data files into a consolidated, clean dataset ready for analysis or modeling.
+
+Logic of Operation:
+1.  **Initialization**:
+    - Loads configuration to locate raw data files (User Items and Steam Games)
+      and define the output directory for processed data.
+    - Validates the existence of required raw files.
+
+2.  **Data Processing (in `run` method)**:
+    - Checks if the processed output file already exists. If so, skips processing
+      to save time.
+    - **User Items Processing**:
+        - Reads the gzipped user data line-by-line.
+        - Parses Python-literal formatted lines to flatten the nested structure
+          (one row per user-item interaction).
+        - Extracts `user_id`, `item_id`, `playtime`, and `item_name`.
+    - **Steam Games Processing**:
+        - Reads and parses the gzipped games data.
+        - Filters for relevant metadata: `id`, `genres`, `tags`, and `title`.
+        - Standardizes column names (renames `id` to `item_id`).
+    - **Merging**:
+        - Merges the user-item interactions with game metadata on `item_id`
+          using a left join.
+    - **Output**:
+        - Saves the final merged dataset to a CSV file in the processed directory
+          (e.g., `data/processed/australian_users_items_merged.csv`).
+"""
+
 import os
 import sys
 import gzip
@@ -62,9 +94,9 @@ class CleanDataService:
                 self.processed_dir, "australian_users_items_merged.csv"
             )
             if os.path.exists(output_path):
-                self.logger.info('data has been cleaned')
+                self.logger.info("data has been cleaned")
             else:
-                    
+
                 with gzip.open(self.user_items_path, "rt", encoding="utf-8") as f:
                     for line in f:
                         try:
@@ -80,7 +112,9 @@ class CleanDataService:
                                     }
                                 )
                         except Exception as e:
-                            self.logger.warning(f"Error parsing line in user items: {e}")
+                            self.logger.warning(
+                                f"Error parsing line in user items: {e}"
+                            )
                             continue
 
                 df_users = pd.DataFrame(rows)

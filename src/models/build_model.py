@@ -1,23 +1,23 @@
 """
 Model Builder Script
 --------------------
-This script defines the `ModelBuilder` class, which is responsible for constructing and compiling
-three different types of recommendation models:
+This script defines the `ModelBuilder` class, which acts as a factory and configuration hub
+for constructing three distinct types of recommendation system models.
 
-1.  **Autoencoder (Content-Based Filtering)**:
-    -   **Data Prep**: Uses TF-IDF to vectorize item descriptions (`item_text`).
-    -   **Model**: A symmetric autoencoder that learns compressed representations (embeddings) of items.
-    -   **Goal**: Reconstruct item features; useful for finding similar items based on content.
+The class handles both the **data preparation** (preprocessing specific to each model architecture)
+and the **model architecture definition** (building the TensorFlow/Keras models).
 
-2.  **Matrix Factorization (Collaborative Filtering)**:
-    -   **Data Prep**: Encodes User IDs and Item Names into integer indices.
-    -   **Model**: Learns separate embedding vectors for Users and Items. Computes the dot product to predict ratings.
-    -   **Goal**: Predict user preference (rating) for unseen items.
+Logic of Operation:
+This script relies on the strategy of defining pairs of methods for each model type:
+1.  `prepare_data_<model_type>`: Transforms the generic pandas DataFrame input into model-specific
+    formats (e.g., TF-IDF matrices, Integer-encoded arrays, or TensorFlow Datasets).
+2.  `build_<model_type>_model`: Defines the neural network architecture.
 
-3.  **TensorFlow Recommenders (TFRS) (Retrieval)**:
-    -   **Data Prep**: Converts inputs to strings and creates TensorFlow Datasets. Builds vocabularies for User IDs, Item Names, and Item Text.
-    -   **Model**: A Two-Tower architecture (User Tower & Item Tower) that learns to map users and items into a shared embedding space.
-    -   **Goal**: Efficiently retrieve top-k relevant items for a user from the entire catalog.
+Supported Models:
+1.  **Autoencoder (Content-Based)**: Reconstructs item vectors to find similarities.
+2.  **Matrix Factorization (Collaborative)**: Learns user/item embeddings to predict ratings.
+3.  **TensorFlow Recommenders (TFRS) (Retrieval)**: A Two-Tower model for efficient retrieval
+    using user and item metadata.
 """
 
 import pandas as pd
@@ -49,7 +49,22 @@ class ModelBuilder:
         self, df: pd.DataFrame
     ) -> Tuple[np.ndarray, pd.Series, list, int]:
         """
-        Prepares data for the Autoencoder model using TF-IDF on item text.
+        Prepares data for the Autoencoder model.
+
+        Input:
+            - df (pd.DataFrame): The transformed dataset containing 'item_text' and 'item_name'.
+
+        Output:
+            - X (np.ndarray): The TF-IDF feature matrix (samples x max_features).
+            - indices (pd.Series): Mapping from item names to dataframe indices.
+            - global_item_names (list): List of unique item names corresponding to the rows of X.
+            - input_dim (int): The number of features in the TF-IDF vectors.
+
+        Logic:
+            1.  **Deduplication**: Drops duplicate items to ensure unique content profiles.
+            2.  **Vectorization**: Uses TfidfVectorizer (max 5000 features) to convert
+                textual descriptions (`item_text`) into numerical vectors.
+            3.  **Metadata Extraction**: Extracts indices and names for later retrieval.
         """
         # Create unique game dataframes for content extraction
         train_content = df.drop_duplicates(subset="item_name").reset_index(drop=True)
@@ -69,7 +84,22 @@ class ModelBuilder:
 
     def build_autoencoder_model(self, input_dim: int, encoding_dim: int = 64) -> Model:
         """
-        Builds an Autoencoder Neural Network.
+        Builds the Autoencoder Neural Network architecture.
+
+        Input:
+            - input_dim (int): Dimensionality of the input textual vectors (from TF-IDF).
+            - encoding_dim (int): Size of the compressed latent representation (bottleneck).
+
+        Output:
+            - model (Model): A compiled Keras model.
+
+        Logic:
+            1.  **Encoder**: Compresses input from `input_dim` -> 512 -> 256 -> `encoding_dim`.
+                Uses ReLU activation.
+            2.  **Decoder**: Reconstructs input from `encoding_dim` -> 256 -> 512 -> `input_dim`.
+                Uses Sigmoid activation at the output (assuming TF-IDF is normalized/bounded).
+            3.  **Compilation**: Uses Adam optimizer and Binary Crossentropy loss (suitable for
+                reconstruction tasks where inputs are essentially probability-like or normalized).
         """
         input_layer = layers.Input(shape=(input_dim,))
 
@@ -99,9 +129,23 @@ class ModelBuilder:
         self, train_df: pd.DataFrame, test_df: pd.DataFrame
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int, int]:
         """
-        Prepares data for Matrix Factorization.
-        Encodes user_id and item_name to integers.
-        Fits encoders on the UNION of train and test to handle all IDs.
+        Prepares data for Matrix Factorization by integer encoding users and items.
+
+        Input:
+            - train_df (pd.DataFrame): Training data with 'user_id' and 'item_name'.
+            - test_df (pd.DataFrame): Testing data with 'user_id' and 'item_name'.
+
+        Output:
+            - train/test_user_ids (np.ndarray): Encoded integer IDs for users.
+            - train/test_item_ids (np.ndarray): Encoded integer IDs for items.
+            - num_users/num_items (int): Total count of unique users and items.
+            - user/item_encoder (LabelEncoder): Fitted encoders for inverse transformation.
+
+        Logic:
+            1.  **Union of IDs**: Concatenates train and test sets to find ALL unique users and items.
+                This ensures that the encoders handle the full vocabulary and don't fail on unseen IDs in test.
+            2.  **Encoding**: Fits LabelEncoder to map strings -> integers (0 to N-1).
+            3.  **Transformation**: Converts the columns in both train and test dataframes to integers.
         """
         user_encoder = LabelEncoder()
         item_encoder = LabelEncoder()
@@ -138,7 +182,23 @@ class ModelBuilder:
         self, num_users: int, num_items: int, embedding_size: int = 50
     ) -> Model:
         """
-        Builds a Matrix Factorization model using Keras Embeddings.
+        Builds a standard Matrix Factorization model.
+
+        Input:
+            - num_users (int): Total number of unique users.
+            - num_items (int): Total number of unique items.
+            - embedding_size (int): Dimension of the embedding vectors.
+
+        Output:
+            - model (Model): A compiled Keras model.
+
+        Logic:
+            1.  **Inputs**: Accepts two integer inputs: user ID and item ID.
+            2.  **Embeddings**: Looks up learnable vectors (size `embedding_size`) for the user and item.
+            3.  **Interaction**: Computes the Dot Product of the user and item vectors.
+                This captures the similarity/affinity between user and item.
+            4.  **Regression**: Outputs a single scalar (predicted rating).
+            5.  **Compilation**: Uses Adam optimizer and Mean Squared Error (MSE) loss.
         """
         user_input = layers.Input(shape=(1,), name="user_input")
         game_input = layers.Input(shape=(1,), name="game_input")
@@ -174,8 +234,23 @@ class ModelBuilder:
         self, train_df: pd.DataFrame, test_df: pd.DataFrame
     ) -> Dict[str, Any]:
         """
-        Prepares data for TFRS model.
-        Returns a dictionary containing datasets and vocabularies.
+        Prepares data for TensorFlow Recommenders (Two-Tower Retrieval).
+
+        Input:
+            - train/test_df (pd.DataFrame): Dataframes containing interactions.
+
+        Output:
+            - data_dict (dict): Contains 'train_ds', 'test_ds' (tf.data.Dataset),
+              'items' (tf.data.Dataset of catalog), and fitted vocabularies/vectorizers.
+
+        Logic:
+            1.  **Type Casting**: Ensures all IDs and text are distinct strings.
+            2.  **Dataset Creation**: Converts Pandas DataFrames into `tf.data.Dataset` objects.
+                - Interaction datasets contain {user_id, item_name, item_text, rating}.
+                - Items dataset (catalog) contains unique {item_name, item_text}.
+            3.  **Vocabulary Adaptation**:
+                - `StringLookup` for User IDs and Item Names: Learn the mapping from string -> int ID.
+                - `TextVectorization` for Item Text: Learns tokens from descriptions for content embedding.
         """
         # Ensure strings
         for df in [train_df, test_df]:
@@ -238,7 +313,31 @@ class ModelBuilder:
 
     def build_tfrs_model(self, data_dict: Dict[str, Any]) -> tfrs.Model:
         """
-        Builds the TFRS Retrieval Model.
+        Builds the TFRS Two-Tower Retrieval Model.
+
+        Input:
+            - data_dict (dict): The dictionary produced by `prepare_data_tfrs`, containing
+              datasets, vocabularies, and vectorizers.
+
+        Output:
+            - model (tfrs.Model): An instance of the custom `SteamTFRSModel`.
+
+        Logic:
+            1.  **User Tower**:
+                - Input: User ID.
+                - Layers: StringLookup -> Embedding (dim=64).
+                - Output: User representation vector.
+            2.  **Item Tower**:
+                - Input: Item Name and Item Text.
+                - Logic:
+                    - Embeds Name (StringLookup -> Embedding).
+                    - Embeds Text (TextVectorization -> Embedding -> GlobalAveragePooling).
+                    - Concatenates Name + Text embeddings -> Dense layer (dim=64).
+                - Output: Item representation vector.
+            3.  **Task (Loss)**: `tfrs.tasks.Retrieval`.
+                - Uses `FactorizedTopK` metric to check if the true item is in the top-K retrieved items.
+                - Computes loss based on the similarity (dot product) between User Tower output
+                  and Item Tower output.
         """
         user_ids_vocabulary = data_dict["user_ids_vocabulary"]
         item_titles_vocabulary = data_dict["item_titles_vocabulary"]

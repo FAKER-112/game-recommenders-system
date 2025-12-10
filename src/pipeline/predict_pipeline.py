@@ -1,3 +1,26 @@
+"""
+Prediction Pipeline Module
+
+This script defines the PredictionPipeline class, which serves as the inference engine
+for the recommender system. It handles loading trained models and generating recommendations
+for users or finding similar items.
+
+Logic of Operation:
+1.  **Initialization**:
+    - Loads the specified model type ('tfrs', 'mf', or 'autoencoder') based on configuration.
+    - Loads the corresponding trained model artifacts (H5 files, SavedModels).
+    - Loads necessary context artifacts (encoders, vocabularies, candidate lists) required
+      to map raw inputs to model inputs and model outputs back to human-readable names.
+2.  **Recommendation (`recommend` method)**:
+    - Accepts a User ID.
+    - Uses the loaded model (or retrieval index) to predict/retrieve top-N items.
+    - Maps internal IDs back to Item Names.
+3.  **Similarity Search (`get_similar_items` method)**:
+    - Accepts an Item Name.
+    - Uses item embeddings (Autoencoder) or item-to-item indices (TFRS) to find closest neighbors.
+    - Returns a list of similar items.
+"""
+
 import os
 import sys
 import pickle
@@ -9,7 +32,10 @@ import tensorflow_recommenders as tfrs
 from tensorflow.keras.models import load_model, Model
 from sklearn.metrics.pairwise import cosine_similarity
 from pathlib import Path
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 sys.path.append(project_root)
 from src.utils.exception import CustomException
 from src.utils.logger import logger
@@ -48,23 +74,24 @@ class PredictionPipeline:
             if self.model_name == "mf":
                 from tensorflow.keras.metrics import MeanSquaredError
                 from tensorflow.keras.losses import MeanSquaredError as MSELoss
+
                 model_path = os.path.join(self.root_dir, "mf_model.h5")
                 self.model = load_model(
                     model_path,
                     custom_objects={
-                        'mse': MSELoss,
-                        'loss': MSELoss,
+                        "mse": MSELoss,
+                        "loss": MSELoss,
                         # Note: The compiled loss "mse" is the issue, often aliased to MeanSquaredError in the internal state.
                         # Including both can help resolve the path.
-                    }
+                    },
                 )
                 self.logger.info(f"Loaded MF model from {model_path}")
-                
+
             elif self.model_name == "autoencoder":
                 model_path = os.path.join(self.root_dir, "autoencoder.h5")
                 self.model = load_model(model_path)
                 self.logger.info(f"Loaded Autoencoder model from {model_path}")
-                
+
             elif self.model_name == "tfrs":
                 # Load the pre-built retrieval index (user-to-item)
                 index_path = os.path.join(self.root_dir, "tfrs_retrieval_index")
@@ -72,19 +99,23 @@ class PredictionPipeline:
                     self.retrieval_index = tf.saved_model.load(index_path)
                     self.logger.info(f"Loaded TFRS retrieval index from {index_path}")
                 else:
-                    raise FileNotFoundError(f"TFRS retrieval index not found at {index_path}")
-                
+                    raise FileNotFoundError(
+                        f"TFRS retrieval index not found at {index_path}"
+                    )
+
                 # Load item-to-item index for similar items
                 item_index_path = os.path.join(self.root_dir, "tfrs_item_index")
                 if os.path.exists(item_index_path):
                     self.item_index = tf.saved_model.load(item_index_path)
                     self.logger.info(f"Loaded TFRS item index from {item_index_path}")
                 else:
-                    self.logger.warning(f"TFRS item index not found at {item_index_path}")
+                    self.logger.warning(
+                        f"TFRS item index not found at {item_index_path}"
+                    )
                     self.item_index = None
             else:
                 raise ValueError(f"Invalid model name: {self.model_name}")
-                
+
         except Exception as e:
             raise CustomException(e)
 
@@ -95,8 +126,10 @@ class PredictionPipeline:
                 # Load pre-computed embeddings and indices
                 X_path = os.path.join(self.context_dir, "autoencoder_X.npy")
                 indices_path = os.path.join(self.context_dir, "autoencoder_indices.csv")
-                itemlist_path = os.path.join(self.context_dir, "autoencoder_itemlist.json")
-                
+                itemlist_path = os.path.join(
+                    self.context_dir, "autoencoder_itemlist.json"
+                )
+
                 if os.path.exists(X_path):
                     self.X = np.load(X_path)
                     self.logger.info(f"Loaded autoencoder X from {X_path}")
@@ -108,12 +141,13 @@ class PredictionPipeline:
                     indices_df = pd.read_csv(indices_path)
                     # Create Series with item_name as index
                     self.indices = pd.Series(
-                        indices_df.iloc[:, 1].values, 
-                        index=indices_df.iloc[:, 0].values
+                        indices_df.iloc[:, 1].values, index=indices_df.iloc[:, 0].values
                     )
                     self.logger.info(f"Loaded autoencoder indices from {indices_path}")
                 else:
-                    self.logger.warning(f"autoencoder indices not found at {indices_path}")
+                    self.logger.warning(
+                        f"autoencoder indices not found at {indices_path}"
+                    )
                     self.indices = None
 
                 if os.path.exists(itemlist_path):
@@ -126,13 +160,17 @@ class PredictionPipeline:
 
             elif self.model_name == "mf":
                 # Load encoders
-                user_encoder_path = os.path.join(self.context_dir, "mf_user_encoder.pkl")
-                item_encoder_path = os.path.join(self.context_dir, "mf_item_encoder.pkl")
-                
+                user_encoder_path = os.path.join(
+                    self.context_dir, "mf_user_encoder.pkl"
+                )
+                item_encoder_path = os.path.join(
+                    self.context_dir, "mf_item_encoder.pkl"
+                )
+
                 with open(user_encoder_path, "rb") as f:
                     self.user_encoder = pickle.load(f)
                     self.logger.info(f"Loaded user encoder from {user_encoder_path}")
-                    
+
                 with open(item_encoder_path, "rb") as f:
                     self.item_encoder = pickle.load(f)
                     self.logger.info(f"Loaded item encoder from {item_encoder_path}")
@@ -142,9 +180,13 @@ class PredictionPipeline:
                 candidates_path = os.path.join(self.context_dir, "tfrs_candidates.csv")
                 if os.path.exists(candidates_path):
                     self.unique_items_df = pd.read_csv(candidates_path)
-                    self.logger.info(f"Loaded {len(self.unique_items_df)} candidates from {candidates_path}")
+                    self.logger.info(
+                        f"Loaded {len(self.unique_items_df)} candidates from {candidates_path}"
+                    )
                 else:
-                    self.logger.warning(f"Candidates file not found at {candidates_path}")
+                    self.logger.warning(
+                        f"Candidates file not found at {candidates_path}"
+                    )
                     self.unique_items_df = None
 
         except Exception as e:
@@ -154,11 +196,11 @@ class PredictionPipeline:
     def recommend(self, user_id, n_rec=10):
         """
         Generates recommendations for a user.
-        
+
         Args:
             user_id: User identifier (string or numeric)
             n_rec: Number of recommendations to return
-            
+
         Returns:
             List of recommended item names
         """
@@ -179,7 +221,7 @@ class PredictionPipeline:
         try:
             # Convert to string for consistency
             user_id = str(user_id)
-            
+
             if user_id not in self.user_encoder.classes_:
                 self.logger.warning(f"User {user_id} not found in training data.")
                 return []
@@ -191,14 +233,18 @@ class PredictionPipeline:
             user_input = np.full(num_items, encoded_user_id)
             item_input = all_item_ids
 
-            predictions = self.model.predict([user_input, item_input], verbose=0).flatten()
+            predictions = self.model.predict(
+                [user_input, item_input], verbose=0
+            ).flatten()
             top_indices = predictions.argsort()[-n_rec:][::-1]
 
             recommended_item_ids = all_item_ids[top_indices]
-            recommended_items = self.item_encoder.inverse_transform(recommended_item_ids)
-            
+            recommended_items = self.item_encoder.inverse_transform(
+                recommended_item_ids
+            )
+
             return recommended_items.tolist()
-            
+
         except Exception as e:
             self.logger.error(f"Error in MF recommendation: {e}")
             raise CustomException(e)
@@ -211,16 +257,16 @@ class PredictionPipeline:
         try:
             # Convert to string for consistency
             user_id = str(user_id)
-            
+
             # Use the pre-built retrieval index
             # The index was built during training and expects string user_id
             _, titles = self.retrieval_index(tf.constant([user_id]))
-            
+
             # Extract top-k recommendations
             recommended_titles = [t.decode("utf-8") for t in titles[0, :n_rec].numpy()]
-            
+
             return recommended_titles
-            
+
         except Exception as e:
             self.logger.error(f"Error in TFRS recommendation: {e}")
             raise CustomException(e)
@@ -228,11 +274,11 @@ class PredictionPipeline:
     def get_similar_items(self, item_name: str, k=10) -> list:
         """
         Finds similar items using Autoencoder embeddings or TFRS item index.
-        
+
         Args:
             item_name: Name of the item to find similar items for
             k: Number of similar items to return
-            
+
         Returns:
             List of similar item names
         """
@@ -242,9 +288,11 @@ class PredictionPipeline:
             elif self.model_name == "tfrs":
                 return self._get_similar_items_tfrs(item_name, k)
             else:
-                self.logger.warning(f"get_similar_items not implemented for {self.model_name}")
+                self.logger.warning(
+                    f"get_similar_items not implemented for {self.model_name}"
+                )
                 return []
-                
+
         except Exception as e:
             self.logger.error(f"Error in get_similar_items: {e}")
             raise CustomException(e)
@@ -276,7 +324,7 @@ class PredictionPipeline:
             sim_scores = cosine_similarity(query_embedding, embeddings).flatten()
 
             # Get top K (excluding self)
-            top_indices = sim_scores.argsort()[-(k + 1):][::-1]
+            top_indices = sim_scores.argsort()[-(k + 1) :][::-1]
 
             recommendations = []
             for i in top_indices:
@@ -284,7 +332,7 @@ class PredictionPipeline:
                     recommendations.append(self.global_item_names[i])
 
             return recommendations
-            
+
         except Exception as e:
             self.logger.error(f"Error in autoencoder similar items: {e}")
             raise CustomException(e)
@@ -295,36 +343,38 @@ class PredictionPipeline:
             if self.item_index is None:
                 self.logger.warning("TFRS item index not loaded.")
                 return []
-            
+
             if self.unique_items_df is None:
                 raise ValueError("Unique items dataframe not loaded.")
-            
+
             # Find the item in candidates
-            item_row = self.unique_items_df[self.unique_items_df['item_name'] == item_name]
+            item_row = self.unique_items_df[
+                self.unique_items_df["item_name"] == item_name
+            ]
             if item_row.empty:
                 self.logger.warning(f"Item '{item_name}' not found in candidates.")
                 return []
-            
-            item_text = item_row.iloc[0]['item_text']
-            
+
+            item_text = item_row.iloc[0]["item_text"]
+
             # Query the item index
             # The item_index expects dict input with item_name and item_text
             query_input = {
-                'item_name': tf.constant([str(item_name)]),
-                'item_text': tf.constant([str(item_text)])
+                "item_name": tf.constant([str(item_name)]),
+                "item_text": tf.constant([str(item_text)]),
             }
-            
+
             _, similar_titles = self.item_index(query_input)
-            
+
             # Extract top-k similar items (excluding self)
             similar_items = []
-            for t in similar_titles[0, :k+1].numpy():
+            for t in similar_titles[0, : k + 1].numpy():
                 title = t.decode("utf-8")
                 if title != item_name and len(similar_items) < k:
                     similar_items.append(title)
-            
+
             return similar_items
-            
+
         except Exception as e:
             self.logger.error(f"Error in TFRS similar items: {e}")
             raise CustomException(e)
@@ -336,39 +386,44 @@ if __name__ == "__main__":
         print("=" * 50)
         print("Testing TFRS Pipeline")
         print("=" * 50)
-        
+
         # TFRS Recommendations
         pipeline_tfrs = PredictionPipeline(model_name="tfrs")
-        user_recommendations = pipeline_tfrs.recommend(user_id="76561197970982479", n_rec=5)
+        user_recommendations = pipeline_tfrs.recommend(
+            user_id="76561197970982479", n_rec=5
+        )
         print(f"\nTFRS Recommendations for user '76561197970982479':")
         for i, item in enumerate(user_recommendations, 1):
             print(f"{i}. {item}")
-        
+
         # TFRS Similar Items
-        if pipeline_tfrs.unique_items_df is not None and len(pipeline_tfrs.unique_items_df) > 0:
-            sample_item = pipeline_tfrs.unique_items_df.iloc[0]['item_name']
+        if (
+            pipeline_tfrs.unique_items_df is not None
+            and len(pipeline_tfrs.unique_items_df) > 0
+        ):
+            sample_item = pipeline_tfrs.unique_items_df.iloc[0]["item_name"]
             similar_items = pipeline_tfrs.get_similar_items(item_name=sample_item, k=5)
             print(f"\nSimilar items to '{sample_item}':")
             for i, item in enumerate(similar_items, 1):
                 print(f"{i}. {item}")
-        
+
         print("\n" + "=" * 50)
         print("Testing MF Pipeline")
         print("=" * 50)
-        
+
         # MF Recommendations
-        pipeline_mf = PredictionPipeline(model_name='mf')
+        pipeline_mf = PredictionPipeline(model_name="mf")
         mf_recommendations = pipeline_mf.recommend(user_id="76561197970982479", n_rec=5)
         print(f"\nMF Recommendations for user '76561197970982479':")
         for i, item in enumerate(mf_recommendations, 1):
             print(f"{i}. {item}")
-        
+
         print("\n" + "=" * 50)
         print("Testing Autoencoder Pipeline")
         print("=" * 50)
-        
+
         # Autoencoder Similar Items
-        pipeline_ae = PredictionPipeline(model_name='autoencoder')
+        pipeline_ae = PredictionPipeline(model_name="autoencoder")
         if len(pipeline_ae.global_item_names) > 0:
             sample_item = pipeline_ae.global_item_names[0]
             ae_similar = pipeline_ae.get_similar_items(item_name=sample_item, k=5)
@@ -379,5 +434,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         raise CustomException(e)

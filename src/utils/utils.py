@@ -1,13 +1,30 @@
+"""
+General Utilities Module
+
+This script provides common helper functions used across the application.
+It includes utilities for downloading files, loading configuration YAMLs,
+and calculating ranking metrics for model evaluation.
+
+Logic of Operation:
+1.  **File Management**: `download_file` handles robust file downloads with chunking and error handling.
+2.  **Configuration**: `load_config` securely parses YAML configuration files into Python dictionaries.
+3.  **Metrics Library**: Implements standard Information Retrieval (IR) metrics:
+    - `calculate_precision_at_k`: Fraction of recommended items that are relevant.
+    - `calculate_ap_at_k`: Average of precisions at each relevant item rank.
+    - `calculate_ndcg_at_k`: Normalized Discounted Cumulative Gain, accounting for position decay.
+"""
+
 import requests
 import os
 import sys
-import pandas as pd 
+import pandas as pd
 import numpy as np
 import yaml
 import math
 from src.utils.logger import logger
 from pathlib import Path
 from src.utils.exception import CustomException
+
 
 def download_file(url, dest_folder):
     # Create the destination folder if it doesn't exist
@@ -16,7 +33,7 @@ def download_file(url, dest_folder):
         logger.info(f"Created directory: {dest_folder}")
 
     # Get the file name from the URL
-    filename = url.split('/')[-1]
+    filename = url.split("/")[-1]
     file_path = os.path.join(dest_folder, filename)
 
     # Download the file
@@ -24,13 +41,15 @@ def download_file(url, dest_folder):
         response = requests.get(url, stream=True)
         response.raise_for_status()  # Raise an error for bad status codes (e.g., 404)
 
-        with open(file_path, 'wb') as file:
+        with open(file_path, "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
         logger.info(f"Downloaded {filename} to {file_path}")
     except requests.exceptions.RequestException as e:
         logger.error(f"Error downloading {url}: {e}")
-        raise CustomException(e) # Re-raise the exception for the caller to handle if needed
+        raise CustomException(
+            e
+        )  # Re-raise the exception for the caller to handle if needed
 
     return file_path
 
@@ -38,12 +57,12 @@ def download_file(url, dest_folder):
 def load_config(config_path: str = "configs/config.yaml") -> dict:
     config_path = Path(config_path)
     if not config_path.exists():
-        raise CustomException(FileNotFoundError(f"Config file not found at {config_path}"))
+        raise CustomException(
+            FileNotFoundError(f"Config file not found at {config_path}")
+        )
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     return config
-
-
 
 
 # --- 1. METRIC FUNCTIONS ---

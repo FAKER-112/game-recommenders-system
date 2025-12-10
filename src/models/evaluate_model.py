@@ -1,3 +1,24 @@
+"""
+Model Evaluation Module
+
+This script defines the ModelEvaluationService class, which provides a comprehensive framework
+for evaluating the performance of trained recommendation models (Autoencoder, MF, and TFRS).
+
+Logic of Operation:
+1.  **Metric Calculation**: Implements ranking metrics (Precision@K, MAP@K, NDCG@K) to assess
+    recommendation quality.
+2.  **Ranking Model Evaluation (MF & TFRS)**:
+    - Loads test data and the trained model.
+    - Generates predictions for a sample of users against a set of candidate items (excluding already played).
+    - Compares top-K recommendations against the actual ground-truth items in the test set.
+    - Logs aggregated metrics to MLflow.
+3.  **Autoencoder Evaluation**:
+    - Uses a content-based "Categorized Accuracy" metric.
+    - Finds nearest neighbors of test items using the learned embeddings.
+    - Checks if the neighbors share similar genres/tags with the query item.
+4.  **Reporting**: Logs all calculated metrics to MLflow for comparison across experiments.
+"""
+
 import numpy as np
 import pandas as pd
 import math
@@ -10,21 +31,31 @@ import mlflow.keras
 from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.neighbors import NearestNeighbors
-project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+project_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
 sys.path.append(project_root)
 from src.utils.exception import CustomException
 from src.utils.logger import logger
-from src.utils.utils import load_config, calculate_precision_at_k, calculate_ap_at_k, calculate_ndcg_at_k
+from src.utils.utils import (
+    load_config,
+    calculate_precision_at_k,
+    calculate_ap_at_k,
+    calculate_ndcg_at_k,
+)
 from src.models.build_model import ModelBuilder
 
+
 class ModelEvaluationService:
-    '''
+    """
     This class is used to evaluate the models.
-    '''
+    """
+
     def __init__(self, config_path: str = "configs/model_params.yaml"):
-        '''
+        """
         This function is used to initialize the ModelEvaluationService class.
-        '''
+        """
         try:
             self.config = load_config(config_path)
             self.logger = logger
@@ -116,7 +147,7 @@ class ModelEvaluationService:
             train_df_raw = pd.read_csv(self.transformed_train_path)
             test_df_raw = pd.read_csv(self.transformed_test_path)
 
-            train_user_ids, train_item_ids, test_user_ids, test_item_ids, _, _, _, _= (
+            train_user_ids, train_item_ids, test_user_ids, test_item_ids, _, _, _, _ = (
                 self.model_builder.prepare_data_mf(train_df_raw, test_df_raw)
             )
 
@@ -144,7 +175,6 @@ class ModelEvaluationService:
 
             model = tf.keras.models.load_model(model_path, compile=False)
             model.compile(optimizer="adam", loss="mse")
-
 
             # Define prediction function for MF
             def mf_predict(user_id, candidates):
@@ -175,9 +205,9 @@ class ModelEvaluationService:
             raise CustomException(e)
 
     def evaluate_autoencoder_model(self, k=5, sample_size=100):
-        '''
+        """
         This function is used to evaluate the Autoencoder model.
-        '''
+        """
         try:
             self.logger.info("Starting Autoencoder Evaluation...")
 
@@ -275,9 +305,9 @@ class ModelEvaluationService:
             raise CustomException(e)
 
     def evaluate_tfrs_model(self, k=10, sample_size=100):
-        '''
+        """
         This function is used to evaluate the TFRS model.
-        '''
+        """
         try:
             self.logger.info("Starting TFRS Evaluation (Brute Force)...")
 
