@@ -60,7 +60,7 @@ The system supports three different recommendation models:
 ## Project Structure
 
 ```
-project_007/
+game-recommenders-system/
 ├── app.py                          # Flask API server
 ├── requirements.txt                # Python dependencies
 ├── configs/                        # Configuration files
