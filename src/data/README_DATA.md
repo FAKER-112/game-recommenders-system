@@ -1,78 +1,119 @@
-data loading, processing and feature engineering
+# Data Pipeline
 
+This directory contains the data processing pipeline for the game recommendation system. The pipeline consists of three sequential modules that transform raw data into machine learning-ready features.
 
-Data Ingestion Module
+## Overview
 
-This script defines the LoadDataService class, which facilitates the initial data ingestion phase
-for the project. Its primary purpose is to ensure that the necessary raw datasets are available
-locally for downstream processing.
+The data pipeline performs the following operations:
+1. **Data Ingestion** - Downloads and stores raw datasets
+2. **Data Cleaning** - Processes and merges raw data files
+3. **Feature Engineering** - Creates features and prepares train/test splits
 
-Logic of Operation:
-1.  **Configuration Loading**: The class initializes by loading a YAML configuration file
-    (defaulting to `configs/config.yaml`) to retrieve data ingestion settings, including
-    download URLs and the target directory for raw data.
-2.  **Environment Setup**: It verifies the existence of the configured raw data directory
-    and creates it if it does not exist.
-3.  **Data Retrieval**: In the `run` method, the service iterates through the list of target URLs:
-    - It extracts the filename from the URL.
-    - It checks if the file already exists in the local raw data directory.
-    - If the file is missing, it downloads it using the `download_file` utility.
-    - If the file exists, it skips the download to prevent redundancy.
-4.  **Logging & Error Handling**: The process provides logging for each step (check/download)
-    and wraps execution in a try-catch block to raise `CustomException` on failure.
+## Modules
 
+### 1. load_data.py
 
-Data Cleaning and Merging Module
+**Purpose**: Initial data ingestion and download management.
 
-This script defines the CleanDataService class, which is responsible for processing
-raw data files into a consolidated, clean dataset ready for analysis or modeling.
+**Class**: `LoadDataService`
 
-Logic of Operation:
-1.  **Initialization**:
-    - Loads configuration to locate raw data files (User Items and Steam Games)
-      and define the output directory for processed data.
-    - Validates the existence of required raw files.
+**Functionality**:
+- Loads configuration from `configs/config.yaml` to retrieve data source URLs and target directories
+- Creates the raw data directory structure if it doesn't exist
+- Downloads missing datasets from configured URLs
+- Skips downloads for files that already exist locally
+- Provides comprehensive logging and error handling via `CustomException`
 
-2.  **Data Processing (in `run` method)**:
-    - Checks if the processed output file already exists. If so, skips processing
-      to save time.
-    - **User Items Processing**:
-        - Reads the gzipped user data line-by-line.
-        - Parses Python-literal formatted lines to flatten the nested structure
-          (one row per user-item interaction).
-        - Extracts `user_id`, `item_id`, `playtime`, and `item_name`.
-    - **Steam Games Processing**:
-        - Reads and parses the gzipped games data.
-        - Filters for relevant metadata: `id`, `genres`, `tags`, and `title`.
-        - Standardizes column names (renames `id` to `item_id`).
-    - **Merging**:
-        - Merges the user-item interactions with game metadata on `item_id`
-          using a left join.
-    - **Output**:
-        - Saves the final merged dataset to a CSV file in the processed directory
-          (e.g., `data/processed/australian_users_items_merged.csv`).
-Feature Engineering Module
+**Output**: Raw data files stored in the configured raw data directory
 
-This script defines the FeatureEngineeringService class, which transforms cleaned data
-into a format suitable for machine learning models. It handles feature creation,
-text processing, and dataset splitting.
+---
 
-Logic of Operation:
-1.  **Initialization**:
-    - Loads configuration to locate the cleaned data file and define output paths
-      for transformed data (train, test, and full dataset).
-2.  **Feature Engineering (in `run` method)**:
-    - **Data Loading**: Reads the cleaned CSV file.
-    - **Rating Creation**: Transforms the 'playtime' feature using `log(1+x)` to
-      create a 'rating' implicit feedback signal, reducing skewness.
-    - **Text Processing**:
-        - Parses 'genres' and 'tags' columns (handling strings, lists, and malformed data).
-        - Joins them into comma-separated strings for storage.
-        - Creates a unified `item_text` column by combining genres and tags,
-          converting to lowercase, and replacing commas with spaces. This is useful
-          for creating content vectors (e.g., using TF-IDF or embeddings).
-    - **Data Cleaning**: Drops intermediate columns and rows with empty text information.
-3.  **Data Splitting & Saving**:
-    - Saves the full transformed dataset.
-    - Splits the data into training (80%) and testing (20%) sets.
-    - Saves the train and test sets to the configured paths.
+### 2. clean_data.py
+
+**Purpose**: Data cleaning, processing, and merging.
+
+**Class**: `CleanDataService`
+
+**Functionality**:
+- **User Items Processing**:
+  - Reads gzipped user-item interaction data
+  - Parses and flattens nested Python-literal formatted data
+  - Extracts key fields: `user_id`, `item_id`, `playtime`, `item_name`
+  
+- **Steam Games Processing**:
+  - Reads gzipped game metadata
+  - Filters relevant features: `id`, `genres`, `tags`, `title`
+  - Standardizes column names (`id` → `item_id`)
+
+- **Data Merging**:
+  - Performs left join of user interactions with game metadata on `item_id`
+  - Creates a consolidated dataset combining user behavior and game attributes
+
+**Output**: Merged CSV file (e.g., `data/processed/australian_users_items_merged.csv`)
+
+---
+
+### 3. feature_engineering.py
+
+**Purpose**: Feature transformation and dataset preparation for machine learning.
+
+**Class**: `FeatureEngineeringService`
+
+**Functionality**:
+- **Rating Creation**: 
+  - Applies log transformation `log(1+x)` to `playtime` to create implicit `rating` signal
+  - Reduces skewness in the target variable
+
+- **Text Processing**:
+  - Parses `genres` and `tags` columns (handles various formats)
+  - Creates `item_text` field by combining genres and tags
+  - Normalizes text to lowercase and formats for vectorization (TF-IDF/embeddings)
+
+- **Data Cleaning**:
+  - Removes rows with missing text information
+  - Drops intermediate processing columns
+
+- **Train/Test Split**:
+  - Splits data into training (80%) and testing (20%) sets
+  - Saves full transformed dataset and separate train/test files
+
+**Output**: 
+- Full transformed dataset
+- Training dataset (80%)
+- Testing dataset (20%)
+
+## Usage
+
+The modules are designed to run sequentially as part of the data pipeline:
+
+```python
+# 1. Load raw data
+from load_data import LoadDataService
+loader = LoadDataService()
+loader.run()
+
+# 2. Clean and merge data
+from clean_data import CleanDataService
+cleaner = CleanDataService()
+cleaner.run()
+
+# 3. Engineer features and create splits
+from feature_engineering import FeatureEngineeringService
+engineer = FeatureEngineeringService()
+engineer.run()
+```
+
+## Configuration
+
+All modules rely on `configs/config.yaml` for:
+- Data source URLs
+- Directory paths (raw, processed, transformed)
+- File naming conventions
+- Processing parameters
+
+## Error Handling
+
+All modules implement robust error handling:
+- Custom exception classes for better debugging
+- Comprehensive logging at each processing step
+- Validation checks for file existence and data integrity
